@@ -112,7 +112,7 @@
   /* ---- STORIES (24H) — miniaturas em triângulo, não círculo ---- */
   .stories-bar{
     display:flex;
-    gap:16px;
+    gap:2px;
     padding:14px 22px 10px;
     overflow-x:auto;
   }
@@ -123,12 +123,11 @@
     align-items:center;
     gap:6px;
     flex-shrink:0;
-    width:58px;
+    width:66px;
   }
   .story-triangle{
-    width:58px; height:58px;
-    padding:3px;
-    background:conic-gradient(from 200deg, var(--lime-soft), #e4f2b0, var(--lime-soft));
+    width:64px; height:64px;
+    padding:0;
     clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
     cursor:pointer;
   }
@@ -255,6 +254,8 @@
   .search-bar input{background:none; border:none; outline:none; color:var(--cream); font-size:14px; width:100%;}
   .search-bar input::placeholder{color:var(--cream-dim);}
   .filters{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;}
+  .date-filter-row{display:flex; gap:8px; margin-top:12px;}
+  .date-select{flex:1; padding:10px 8px; font-size:12.5px; color-scheme:dark;}
   .filter-chip{font-size:12px; font-weight:600; padding:7px 14px; border-radius:100px; border:1px solid var(--hair); color:var(--cream-dim); background:none; cursor:pointer;}
   .filter-chip.on{background:var(--lime-soft); border-color:var(--lime-soft); color:#1c2a3a;}
   .results-label{font-size:11px; color:var(--cream-dim); text-transform:uppercase; letter-spacing:0.1em; margin:20px 0 10px;}
@@ -472,6 +473,11 @@
           <button class="filter-chip" data-field="date">Datas</button>
           <button class="filter-chip" data-field="people">Pessoas</button>
           <button class="filter-chip" data-field="subject">Momentos</button>
+        </div>
+        <div class="date-filter-row" id="date-filter-row" style="display:none;">
+          <select class="field-input date-select" id="date-year"><option value="">Ano</option></select>
+          <select class="field-input date-select" id="date-month"><option value="">Mês</option></select>
+          <select class="field-input date-select" id="date-day"><option value="">Dia</option></select>
         </div>
         <div class="results-label" id="search-results-label">Suas recordações</div>
         <div class="grid" id="search-results-grid"></div>
@@ -871,32 +877,77 @@ function renderTimeline(){
 const searchInput = document.getElementById('search-input');
 const resultsGrid = document.getElementById('search-results-grid');
 const resultsLabel = document.getElementById('search-results-label');
+const searchBarEl = document.querySelector('.search-bar');
+const dateFilterRow = document.getElementById('date-filter-row');
+const yearSelect = document.getElementById('date-year');
+const monthSelect = document.getElementById('date-month');
+const daySelect = document.getElementById('date-day');
+const MONTHS_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 let activeField = 'all';
+
 document.querySelectorAll('.filter-chip').forEach(chip=>{
   chip.addEventListener('click', ()=>{
     document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('on'));
     chip.classList.add('on');
     activeField = chip.dataset.field;
+    if (activeField === 'date') {
+      searchBarEl.style.display = 'none';
+      dateFilterRow.style.display = 'flex';
+      populateDateSelects();
+    } else {
+      searchBarEl.style.display = 'flex';
+      dateFilterRow.style.display = 'none';
+    }
     renderSearch();
   });
 });
 searchInput.addEventListener('input', renderSearch);
+[yearSelect, monthSelect, daySelect].forEach(sel => sel.addEventListener('change', renderSearch));
+
+function populateDateSelects(){
+  const years = Array.from(new Set(visibleMoments().map(m => m.date.slice(0,4)))).sort().reverse();
+  const curYear = yearSelect.value;
+  yearSelect.innerHTML = '<option value="">Ano</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
+  yearSelect.value = years.includes(curYear) ? curYear : '';
+
+  if (!monthSelect.dataset.built) {
+    monthSelect.innerHTML = '<option value="">Mês</option>' + MONTHS_PT.map((m,i) => `<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
+    monthSelect.dataset.built = '1';
+  }
+  if (!daySelect.dataset.built) {
+    daySelect.innerHTML = '<option value="">Dia</option>' + Array.from({length:31}, (_,i)=>String(i+1).padStart(2,'0')).map(d => `<option value="${d}">${d}</option>`).join('');
+    daySelect.dataset.built = '1';
+  }
+}
+
 function norm(s){ return (s||'').toString().toLowerCase(); }
 
 function renderSearch(){
   if (!currentUser) return;
-  const q = norm(searchInput.value);
   const pool = visibleMoments();
-  const filtered = pool.filter(m=>{
-    const peopleNames = m.taggedIds.map(id => users.find(u=>u.id===id)?.nome || '');
-    if (!q) return true;
-    if (activeField === 'date') return norm(m.dateLabel).includes(q) || norm(m.date).includes(q);
-    if (activeField === 'people') return peopleNames.some(p=>norm(p).includes(q));
-    if (activeField === 'subject') return norm(m.subject).includes(q);
-    return norm(m.dateLabel).includes(q) || norm(m.place).includes(q) || norm(m.subject).includes(q) ||
-           norm(m.caption).includes(q) || peopleNames.some(p=>norm(p).includes(q));
-  });
-  resultsLabel.textContent = q ? `Resultados para "${searchInput.value}"` : 'Suas recordações';
+  let filtered;
+
+  if (activeField === 'date') {
+    const y = yearSelect.value, mo = monthSelect.value, d = daySelect.value;
+    filtered = pool.filter(m => {
+      const [my, mm, md] = m.date.split('-');
+      return (!y || my === y) && (!mo || mm === mo) && (!d || md === d);
+    });
+    const parts = [d, mo && MONTHS_PT[parseInt(mo,10)-1], y].filter(Boolean);
+    resultsLabel.textContent = parts.length ? `Resultados para ${parts.join(' ')}` : 'Suas recordações';
+  } else {
+    const q = norm(searchInput.value);
+    filtered = pool.filter(m=>{
+      const peopleNames = m.taggedIds.map(id => users.find(u=>u.id===id)?.nome || '');
+      if (!q) return true;
+      if (activeField === 'people') return peopleNames.some(p=>norm(p).includes(q));
+      if (activeField === 'subject') return norm(m.subject).includes(q);
+      return norm(m.dateLabel).includes(q) || norm(m.place).includes(q) || norm(m.subject).includes(q) ||
+             norm(m.caption).includes(q) || peopleNames.some(p=>norm(p).includes(q));
+    });
+    resultsLabel.textContent = q ? `Resultados para "${searchInput.value}"` : 'Suas recordações';
+  }
+
   resultsGrid.innerHTML = filtered.map(m => `
     <div class="grid-item">
       ${m.isVideo ? `<video src="${m.mediaUrl}" muted></video>` : `<img src="${m.mediaUrl}">`}
