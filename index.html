@@ -601,13 +601,78 @@
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-/* ================= DADOS EM MEMÓRIA (some ao recarregar a página) ================= */
-let users = [];          // {id, nome, usuario, email, telefone, nascimento, senha, criadoEm}
+/* ================= CONFIGURAÇÃO DO SUPABASE =================
+   Cole aqui a URL e a chave "anon public" do seu projeto
+   (Project Settings → API no painel do Supabase). */
+const SUPABASE_URL = 'https://xbwsrbbsmhgavhzvdrfa.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_m9ocT-kowhvlv01I3789_Q_s1lcN30I';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const BUCKET = 'media';
+
+/* ================= DADOS (agora vindos do Supabase, não mais só da memória) ================= */
+let users = [];          // {id, nome, usuario, email, telefone, nascimento, criadoEm}
 let moments = [];        // {id, authorId, taggedIds:[], date, dateLabel, place, subject, caption, mediaUrl, isVideo, extraCount}
 let stories = [];        // {id, authorId, url, isVideo, caption, createdAt}
 let connections = new Set(); // "id1|id2" pares conectados
 let currentUser = null;
+
+function publicUrl(path){
+  return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+async function fetchProfiles(){
+  const { data, error } = await sb.from('profiles').select('*');
+  if (error) { console.error(error); return; }
+  users = (data || []).map(p => ({
+    id: p.id, nome: p.nome, usuario: p.usuario, email: '',
+    telefone: p.telefone, nascimento: p.nascimento, criadoEm: new Date(p.created_at)
+  }));
+}
+
+async function fetchConnections(){
+  const { data, error } = await sb.from('connections').select('*');
+  if (error) { console.error(error); return; }
+  connections = new Set((data || []).map(c => connKey(c.user_a, c.user_b)));
+}
+
+async function fetchMoments(){
+  const { data, error } = await sb.from('moments').select('*').order('date', { ascending: false });
+  if (error) { console.error(error); return; }
+  const months = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+  moments = (data || []).map(m => {
+    const media = m.media || [];
+    const first = media[0] || {};
+    const d = new Date(m.date + 'T00:00:00');
+    return {
+      id: m.id, authorId: m.author_id, taggedIds: m.tagged_ids || [],
+      date: m.date,
+      dateLabel: `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`,
+      place: m.place, subject: m.subject, caption: m.caption,
+      mediaUrl: first.path ? publicUrl(first.path) : '',
+      isVideo: !!first.isVideo,
+      extraCount: media.length > 1 ? media.length - 1 : 0
+    };
+  });
+}
+
+async function fetchStories(){
+  // só busca stories das últimas 24h
+  const since = new Date(Date.now() - 24*60*60*1000).toISOString();
+  const { data, error } = await sb.from('stories').select('*').gte('created_at', since).order('created_at', { ascending: true });
+  if (error) { console.error(error); return; }
+  stories = (data || []).map(s => ({
+    id: s.id, authorId: s.author_id, url: publicUrl(s.media_path),
+    isVideo: s.is_video, caption: s.caption, createdAt: new Date(s.created_at)
+  }));
+}
+
+async function syncAll(){
+  await Promise.all([fetchProfiles(), fetchConnections(), fetchMoments(), fetchStories()]);
+  renderAll();
+}
+
 
 const PALETTE = ['#3a6ea0','#3f6e68','#9fc93a','#b6893f','#7a5ba6','#c1584f','#2c5c8c'];
 function colorFor(str){
@@ -635,56 +700,83 @@ document.querySelectorAll('.auth-tab').forEach(tab=>{
 });
 
 /* ================= CADASTRO ================= */
-document.getElementById('form-cadastro').addEventListener('submit', (e)=>{
+document.getElementById('form-cadastro').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const nome = document.getElementById('cad-nome').value.trim();
   const usuario = document.getElementById('cad-usuario').value.trim();
   const email = document.getElementById('cad-email').value.trim().toLowerCase();
   const telefone = document.getElementById('cad-telefone').value.trim();
-  const nascimento = document.getElementById('cad-nascimento').value;
+  const nascimento = document.getElementById('cad-nascimento').value || null;
   const senha = document.getElementById('cad-senha').value;
   const senha2 = document.getElementById('cad-senha2').value;
   const err = document.getElementById('cadastro-error');
+  const btn = e.target.querySelector('.auth-submit');
 
   if (!nome || !usuario || !email || !senha) { err.textContent = 'Preencha nome, usuário, e-mail e senha.'; return; }
   if (senha !== senha2) { err.textContent = 'As senhas não conferem.'; return; }
-  if (users.some(u => u.email === email)) { err.textContent = 'Já existe uma conta de teste com esse e-mail.'; return; }
 
-  const user = { id: 'u' + Date.now() + Math.floor(Math.random()*1000), nome, usuario, email, telefone, nascimento, senha, criadoEm: new Date() };
-  users.push(user);
+  btn.disabled = true; btn.textContent = 'Criando conta...';
+  const { data, error } = await sb.auth.signUp({ email, password: senha });
+  if (error) { err.textContent = traduzErro(error.message); btn.disabled = false; btn.textContent = 'Criar conta'; return; }
+
+  const { error: perr } = await sb.from('profiles').insert({ id: data.user.id, nome, usuario, telefone, nascimento });
+  if (perr) { err.textContent = 'Conta criada, mas o perfil falhou: ' + perr.message; btn.disabled = false; btn.textContent = 'Criar conta'; return; }
+
   err.textContent = '';
   e.target.reset();
-  login(user);
+  btn.disabled = false; btn.textContent = 'Criar conta';
+  await enterAppAfterAuth();
 });
 
+function traduzErro(msg){
+  if (/already registered/i.test(msg)) return 'Já existe uma conta com esse e-mail.';
+  if (/password/i.test(msg)) return 'A senha precisa ter pelo menos 6 caracteres.';
+  return msg;
+}
+
 /* ================= LOGIN ================= */
-document.getElementById('form-login').addEventListener('submit', (e)=>{
+document.getElementById('form-login').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const email = document.getElementById('login-email').value.trim().toLowerCase();
   const senha = document.getElementById('login-password').value;
   const err = document.getElementById('login-error');
-  const user = users.find(u => u.email === email && u.senha === senha);
-  if (!user) { err.textContent = 'E-mail ou senha não encontrados. Crie uma conta primeiro.'; return; }
+  const btn = e.target.querySelector('.auth-submit');
+
+  btn.disabled = true; btn.textContent = 'Entrando...';
+  const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+  btn.disabled = false; btn.textContent = 'Entrar';
+  if (error) { err.textContent = 'E-mail ou senha incorretos.'; return; }
   err.textContent = '';
-  login(user);
+  await enterAppAfterAuth();
 });
 
-function login(user){
-  currentUser = user;
+async function enterAppAfterAuth(){
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return;
+  await fetchProfiles();
+  currentUser = users.find(u => u.id === session.user.id);
+  if (!currentUser) return; // perfil ainda não existe (raro)
   document.getElementById('auth-view').style.display = 'none';
   document.getElementById('app-screens').style.display = '';
   document.getElementById('bottomnav').style.display = '';
   document.getElementById('login-email').value = '';
   document.getElementById('login-password').value = '';
-  renderAll();
+  await syncAll();
 }
 
-document.getElementById('logout-btn').addEventListener('click', ()=>{
+document.getElementById('logout-btn').addEventListener('click', async ()=>{
+  await sb.auth.signOut();
   currentUser = null;
   document.getElementById('app-screens').style.display = 'none';
   document.getElementById('bottomnav').style.display = 'none';
   document.getElementById('auth-view').style.display = 'flex';
 });
+
+/* Restaura a sessão automaticamente se a pessoa já estava logada (fecha e reabre o navegador, por exemplo) */
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await enterAppAfterAuth();
+})();
 
 /* ================= NAV ================= */
 document.querySelectorAll('.navbtn').forEach(btn=>{
@@ -979,14 +1071,17 @@ function renderInvites(){
     `;
   }).join('');
   list.querySelectorAll('.accept-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const key = connKey(currentUser.id, btn.dataset.id);
-      if (connections.has(key)) connections.delete(key); else connections.add(key);
-      renderInvites();
-      renderProfile();
-      renderStories();
-      renderTimeline();
-      renderSearch();
+    btn.addEventListener('click', async ()=>{
+      btn.disabled = true;
+      const otherId = btn.dataset.id;
+      const already = connections.has(connKey(currentUser.id, otherId));
+      const [a, b] = [currentUser.id, otherId].sort();
+      if (already) {
+        await sb.from('connections').delete().eq('user_a', a).eq('user_b', b);
+      } else {
+        await sb.from('connections').insert({ user_a: a, user_b: b });
+      }
+      await syncAll();
     });
   });
 }
@@ -1068,25 +1163,31 @@ document.getElementById('post-file-input').addEventListener('change', (e)=>{
   document.getElementById('post-submit').disabled = postFiles.length === 0;
 });
 
-document.getElementById('post-submit').addEventListener('click', ()=>{
+document.getElementById('post-submit').addEventListener('click', async ()=>{
   if (!postFiles.length) return;
+  const btn = document.getElementById('post-submit');
+  btn.disabled = true; btn.textContent = 'Publicando...';
+
   const dateVal = document.getElementById('post-date').value || new Date().toISOString().slice(0,10);
-  const d = new Date(dateVal + 'T00:00:00');
-  const months = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
-  const dateLabel = `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
   const place = document.getElementById('post-place').value.trim();
   const subject = document.getElementById('post-subject').value.trim() || 'Momento';
   const caption = document.getElementById('post-caption').value.trim();
-  const coverUrl = URL.createObjectURL(postFiles[0]);
-  const isVideo = postFiles[0].type.startsWith('video');
 
-  moments.push({
-    id:'m'+Date.now(), authorId: currentUser.id, taggedIds: Array.from(selectedTagIds),
-    date: dateVal, dateLabel, place, subject, caption, mediaUrl: coverUrl, isVideo,
-    extraCount: postFiles.length > 1 ? postFiles.length - 1 : 0
+  const media = [];
+  for (const file of postFiles) {
+    const path = `${currentUser.id}/${crypto.randomUUID()}-${file.name}`;
+    const { error: upErr } = await sb.storage.from(BUCKET).upload(path, file);
+    if (upErr) { alert('Falha ao enviar arquivo: ' + upErr.message); btn.disabled = false; btn.textContent = 'Publicar'; return; }
+    media.push({ path, isVideo: file.type.startsWith('video') });
+  }
+
+  const { error } = await sb.from('moments').insert({
+    author_id: currentUser.id, date: dateVal, place, subject, caption,
+    tagged_ids: Array.from(selectedTagIds), media
   });
+  if (error) { alert('Falha ao publicar: ' + error.message); btn.disabled = false; btn.textContent = 'Publicar'; return; }
 
-  renderTimeline(); renderSearch(); renderProfile();
+  await syncAll();
 
   postFiles = [];
   document.getElementById('post-preview-row').innerHTML = '';
@@ -1095,7 +1196,7 @@ document.getElementById('post-submit').addEventListener('click', ()=>{
   document.getElementById('post-place').value = '';
   document.getElementById('post-subject').value = '';
   document.getElementById('post-caption').value = '';
-  document.getElementById('post-submit').disabled = true;
+  btn.disabled = true; btn.textContent = 'Publicar';
   closeModal('modal-post');
 });
 
@@ -1116,18 +1217,32 @@ document.getElementById('story-file-input').addEventListener('change', (e)=>{
   document.getElementById('story-submit').disabled = !storyFile;
 });
 
-document.getElementById('story-submit').addEventListener('click', ()=>{
+document.getElementById('story-submit').addEventListener('click', async ()=>{
   if (!storyFile) return;
-  const url = URL.createObjectURL(storyFile);
-  stories.push({ id:'s'+Date.now(), authorId: currentUser.id, url, isVideo: storyFile.type.startsWith('video'), caption: document.getElementById('story-caption').value.trim(), createdAt: new Date() });
-  renderStories();
+  const btn = document.getElementById('story-submit');
+  btn.disabled = true; btn.textContent = 'Publicando...';
+
+  const path = `${currentUser.id}/${crypto.randomUUID()}-${storyFile.name}`;
+  const { error: upErr } = await sb.storage.from(BUCKET).upload(path, storyFile);
+  if (upErr) { alert('Falha ao enviar arquivo: ' + upErr.message); btn.disabled = false; btn.textContent = 'Publicar momento'; return; }
+
+  const { error } = await sb.from('stories').insert({
+    author_id: currentUser.id, media_path: path,
+    is_video: storyFile.type.startsWith('video'),
+    caption: document.getElementById('story-caption').value.trim()
+  });
+  if (error) { alert('Falha ao publicar: ' + error.message); btn.disabled = false; btn.textContent = 'Publicar momento'; return; }
+
+  await syncAll();
+
   storyFile = null;
   document.getElementById('story-preview-row').innerHTML = '';
   document.getElementById('story-drop-label').textContent = 'Toque para escolher uma foto ou vídeo';
   document.getElementById('story-caption').value = '';
-  document.getElementById('story-submit').disabled = true;
+  btn.disabled = true; btn.textContent = 'Publicar momento';
   closeModal('modal-story');
 });
 </script>
 </body>
 </html>
+
