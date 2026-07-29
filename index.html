@@ -283,6 +283,16 @@
   .cover{height:130px; background:linear-gradient(120deg, #3a6ea0, #1f3a56 70%); position:relative;}
   .profile-head{padding:0 22px; margin-top:-40px; position:relative;}
   .profile-avatar{width:82px; height:82px; font-size:30px; border:4px solid var(--ink-2);}
+  .avatar-edit-wrap{position:relative; width:82px; height:82px; cursor:pointer;}
+  .avatar-edit-badge{
+    position:absolute; right:-2px; bottom:-2px;
+    width:26px; height:26px; border-radius:50%;
+    background:var(--lime-soft); color:#1c2a3a;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; border:2px solid var(--ink-2);
+    pointer-events:none;
+  }
+  .avatar-edit-wrap input[type=file]{position:absolute; inset:0; opacity:0; cursor:pointer;}
   .profile-name{font-family:'Fraunces',serif; font-size:20px; color:var(--cream); margin-top:12px;}
   .profile-bio{font-size:12.5px; color:var(--cream-dim); margin-top:4px; line-height:1.5;}
   .stat-row{display:flex; gap:22px; margin-top:16px; padding-bottom:16px; border-bottom:1px solid var(--hair);}
@@ -326,6 +336,14 @@
   .auth-form{display:none; flex-direction:column;}
   .auth-form.on{display:flex;}
   .field-label{font-size:11px; color:var(--cream-dim); text-transform:uppercase; letter-spacing:0.08em; margin:10px 0 6px;}
+  .avatar-upload-row{display:flex; align-items:center; gap:10px;}
+  .avatar-upload-preview{
+    width:52px; height:52px; border-radius:50%; flex-shrink:0;
+    background:var(--paper-2); overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; color:var(--text-fade);
+  }
+  .avatar-upload-preview img{width:100%; height:100%; object-fit:cover;}
   .field-label:first-child{margin-top:0;}
   .field-input{
     width:100%; background:rgba(255,255,255,0.06); border:1px solid var(--hair);
@@ -439,6 +457,15 @@
 
     <!-- CADASTRO -->
     <form class="auth-form" id="form-cadastro">
+      <div class="field-label">Foto de perfil (opcional)</div>
+      <div class="avatar-upload-row">
+        <div class="avatar-upload-preview" id="cad-avatar-preview">＋</div>
+        <div class="file-drop" style="flex:1; padding:12px;">
+          <span id="cad-avatar-label">Toque para escolher uma foto</span>
+          <input type="file" id="cad-avatar-input" accept="image/*">
+        </div>
+      </div>
+
       <div class="field-label">Nome completo</div>
       <input class="field-input" type="text" id="cad-nome" placeholder="Seu nome completo">
 
@@ -541,7 +568,11 @@
     <div class="screen" id="screen-profile">
       <div class="cover"></div>
       <div class="profile-head">
-        <div class="avatar-circle profile-avatar" id="profile-avatar"></div>
+        <div class="avatar-edit-wrap" id="avatar-edit-wrap">
+          <div class="avatar-circle profile-avatar" id="profile-avatar"></div>
+          <div class="avatar-edit-badge">✎</div>
+          <input type="file" id="avatar-change-input" accept="image/*">
+        </div>
         <div class="profile-name" id="profile-name"></div>
         <div class="profile-bio" id="profile-bio"></div>
         <div class="stat-row">
@@ -724,7 +755,8 @@ async function fetchProfiles(){
   if (error) { console.error(error); return; }
   users = (data || []).map(p => ({
     id: p.id, nome: p.nome, usuario: p.usuario, email: '',
-    telefone: p.telefone, nascimento: p.nascimento, criadoEm: new Date(p.created_at)
+    telefone: p.telefone, nascimento: p.nascimento, criadoEm: new Date(p.created_at),
+    avatarUrl: p.avatar_path ? publicUrl(p.avatar_path) : null
   }));
 }
 
@@ -798,6 +830,12 @@ function initials(name){
 function avatarHTML(name, size){
   return `<div class="avatar-circle" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.4)}px;background:${colorFor(name)};">${initials(name)}</div>`;
 }
+function avatarHTMLForUser(user, size){
+  if (user && user.avatarUrl) {
+    return `<div class="avatar-circle" style="width:${size}px;height:${size}px;padding:0;overflow:hidden;"><img src="${user.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"></div>`;
+  }
+  return avatarHTML(user ? user.nome : '?', size);
+}
 function connKey(a,b){ return [a,b].sort().join('|'); }
 
 /* ================= AUTH: TABS ================= */
@@ -808,6 +846,20 @@ document.querySelectorAll('.auth-tab').forEach(tab=>{
     tab.classList.add('on');
     document.getElementById('form-' + tab.dataset.tab).classList.add('on');
   });
+});
+
+let cadAvatarFile = null;
+document.getElementById('cad-avatar-input').addEventListener('change', (e)=>{
+  cadAvatarFile = (e.target.files || [])[0] || null;
+  const preview = document.getElementById('cad-avatar-preview');
+  const label = document.getElementById('cad-avatar-label');
+  if (cadAvatarFile) {
+    preview.innerHTML = `<img src="${URL.createObjectURL(cadAvatarFile)}">`;
+    label.textContent = 'Foto selecionada';
+  } else {
+    preview.innerHTML = '＋';
+    label.textContent = 'Toque para escolher uma foto';
+  }
 });
 
 /* ================= CADASTRO ================= */
@@ -830,11 +882,21 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e)=>{
   const { data, error } = await sb.auth.signUp({ email, password: senha });
   if (error) { err.textContent = traduzErro(error.message); btn.disabled = false; btn.textContent = 'Criar conta'; return; }
 
-  const { error: perr } = await sb.from('profiles').insert({ id: data.user.id, nome, usuario, telefone, nascimento });
+  let avatarPath = null;
+  if (cadAvatarFile) {
+    const path = `avatars/${data.user.id}-${crypto.randomUUID()}-${cadAvatarFile.name}`;
+    const { error: avErr } = await sb.storage.from(BUCKET).upload(path, cadAvatarFile);
+    if (!avErr) avatarPath = path;
+  }
+
+  const { error: perr } = await sb.from('profiles').insert({ id: data.user.id, nome, usuario, telefone, nascimento, avatar_path: avatarPath });
   if (perr) { err.textContent = 'Conta criada, mas o perfil falhou: ' + perr.message; btn.disabled = false; btn.textContent = 'Criar conta'; return; }
 
+  cadAvatarFile = null;
   err.textContent = '';
   e.target.reset();
+  document.getElementById('cad-avatar-preview').innerHTML = '＋';
+  document.getElementById('cad-avatar-label').textContent = 'Toque para escolher uma foto';
   btn.disabled = false; btn.textContent = 'Criar conta';
   await enterAppAfterAuth();
 });
@@ -882,6 +944,20 @@ document.getElementById('logout-btn').addEventListener('click', async ()=>{
   document.getElementById('app-screens').style.display = 'none';
   document.getElementById('bottomnav').style.display = 'none';
   document.getElementById('auth-view').style.display = 'flex';
+});
+
+document.getElementById('avatar-change-input').addEventListener('change', async (e)=>{
+  const file = (e.target.files || [])[0];
+  if (!file || !currentUser) return;
+  const wrap = document.getElementById('avatar-edit-wrap');
+  wrap.style.opacity = '0.5';
+  const path = `avatars/${currentUser.id}-${crypto.randomUUID()}-${file.name}`;
+  const { error: upErr } = await sb.storage.from(BUCKET).upload(path, file);
+  if (upErr) { alert('Falha ao enviar a foto: ' + upErr.message); wrap.style.opacity = '1'; return; }
+  const { error } = await sb.from('profiles').update({ avatar_path: path }).eq('id', currentUser.id);
+  wrap.style.opacity = '1';
+  if (error) { alert('Falha ao salvar a foto: ' + error.message); return; }
+  await syncAll();
 });
 
 /* Restaura a sessão automaticamente se a pessoa já estava logada (fecha e reabre o navegador, por exemplo) */
@@ -1260,7 +1336,7 @@ function renderInvites(){
     <div class="section-title">Convites recebidos</div>
     ${received.map(u => `
       <div class="person-row">
-        ${avatarHTML(u.nome, 42)}
+        ${avatarHTMLForUser(u, 42)}
         <div>
           <div class="person-name" data-open-profile="${u.id}">${u.nome}</div>
           <div class="person-sub">@${u.usuario} · quer se conectar</div>
@@ -1279,7 +1355,7 @@ function renderInvites(){
       const label = connected ? 'Conectado ✓' : (sent ? 'Convite enviado' : 'Convidar');
       return `
         <div class="person-row">
-          ${avatarHTML(u.nome, 42)}
+          ${avatarHTMLForUser(u, 42)}
           <div>
             <div class="person-name" data-open-profile="${u.id}">${u.nome}</div>
             <div class="person-sub">@${u.usuario}</div>
@@ -1330,7 +1406,7 @@ function renderInvites(){
 /* ================= PERFIL ================= */
 async function renderProfile(){
   if (!currentUser) return;
-  document.getElementById('profile-avatar').outerHTML = avatarHTML(currentUser.nome, 82).replace('avatar-circle', 'avatar-circle profile-avatar').replace('<div', '<div id="profile-avatar"');
+  document.getElementById('profile-avatar').outerHTML = avatarHTMLForUser(currentUser, 82).replace('avatar-circle', 'avatar-circle profile-avatar').replace('<div', '<div id="profile-avatar"');
   document.getElementById('profile-name').textContent = currentUser.nome;
   document.getElementById('profile-bio').textContent = `@${currentUser.usuario} · ${currentUser.email}`;
   const own = moments.filter(m=>m.authorId===currentUser.id).sort((a,b)=>b.date.localeCompare(a.date));
@@ -1394,7 +1470,7 @@ document.getElementById('own-testimonials-btn').addEventListener('click', ()=>{
 async function openUserProfile(userId){
   const u = users.find(x => x.id === userId);
   if (!u) return;
-  document.getElementById('upv-avatar').outerHTML = avatarHTML(u.nome, 82).replace('avatar-circle', 'avatar-circle profile-avatar').replace('<div', '<div id="upv-avatar"');
+  document.getElementById('upv-avatar').outerHTML = avatarHTMLForUser(u, 82).replace('avatar-circle', 'avatar-circle profile-avatar').replace('<div', '<div id="upv-avatar"');
   document.getElementById('upv-name').textContent = u.nome;
   document.getElementById('upv-bio').textContent = `@${u.usuario}`;
   document.getElementById('upv-since').textContent = u.criadoEm.getFullYear();
@@ -1484,7 +1560,7 @@ function renderPeopleSelect(preselectedIds){
     return;
   }
   wrap.innerHTML = others.map(u => `
-    <button type="button" class="tag-select ${selectedTagIds.has(u.id) ? 'on' : ''}" data-id="${u.id}">${avatarHTML(u.nome,18).replace('avatar-circle','avatar-circle mini-avatar')} ${u.nome}</button>
+    <button type="button" class="tag-select ${selectedTagIds.has(u.id) ? 'on' : ''}" data-id="${u.id}">${avatarHTMLForUser(u,18).replace('avatar-circle','avatar-circle mini-avatar')} ${u.nome}</button>
   `).join('');
   wrap.querySelectorAll('.tag-select').forEach(btn=>{
     btn.addEventListener('click', ()=>{
