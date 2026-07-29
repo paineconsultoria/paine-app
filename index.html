@@ -112,7 +112,7 @@
   /* ---- STORIES (24H) — miniaturas em triângulo, não círculo ---- */
   .stories-bar{
     display:flex;
-    gap:2px;
+    gap:0;
     padding:14px 22px 10px;
     overflow-x:auto;
   }
@@ -224,9 +224,13 @@
   .card .tags{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;}
   .tag{font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:100px; background:rgba(31,58,86,0.08); color:var(--teal);}
   .tag.people{background:rgba(159,201,58,0.16); color:#5c7a2c;}
-  .card .caption{font-family:'Fraunces',serif; font-size:15px; line-height:1.45; color:var(--text-dark);}
+  .card .caption{font-family:'Fraunces',serif; font-size:13px; line-height:1.42; color:var(--text-dark);}
   .card .foot{display:flex; align-items:center; justify-content:space-between; margin-top:12px; padding-top:10px; border-top:1px solid rgba(28,42,58,0.08);}
   .card .place{font-size:11.5px; color:var(--text-fade);}
+  .foot-actions{display:flex; align-items:center; gap:2px;}
+  .icon-btn{background:none; border:none; cursor:pointer; font-size:13px; color:var(--text-fade); padding:4px 6px;}
+  .icon-btn:hover{color:var(--teal);}
+  .card-media{cursor:pointer;}
   .share-btn{display:flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--text-fade); background:none; border:none; cursor:pointer; padding:4px 6px;}
   .share-btn:hover{color:var(--teal);}
   .empty-state{
@@ -269,7 +273,8 @@
   .section-title{font-family:'Fraunces',serif; font-size:15px; color:var(--cream); margin:18px 0 10px;}
   .note{font-size:12.5px; color:var(--cream-dim); line-height:1.55; background:rgba(255,255,255,0.05); border:1px solid var(--hair); border-radius:12px; padding:12px 14px;}
   .person-row{display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid var(--hair);}
-  .person-name{font-size:13.5px; font-weight:600; color:var(--cream);}
+  .person-name{font-size:13.5px; font-weight:600; color:var(--cream); cursor:pointer; display:inline-block;}
+  .person-name:hover{text-decoration:underline;}
   .person-sub{font-size:11.5px; color:var(--cream-dim); margin-top:1px;}
   .accept-btn{margin-left:auto; font-size:11.5px; font-weight:700; color:#1c2129; background:var(--lime-soft); border:none; border-radius:100px; padding:7px 13px; cursor:pointer;}
   .accept-btn.connected{background:none; border:1px solid var(--hair); color:var(--cream-dim);}
@@ -363,6 +368,38 @@
   .tag-select .mini-avatar{width:18px; height:18px; font-size:9px;}
   .submit-btn{width:100%; margin-top:18px; padding:14px; border:none; border-radius:100px; background:var(--lime-soft); color:#1c2a3a; font-weight:700; font-size:13.5px; cursor:pointer;}
   .submit-btn:disabled{opacity:0.45; cursor:not-allowed;}
+
+  /* ---- VISUALIZADOR DE FOTO DE UM POST ---- */
+  .photo-viewer{
+    position:absolute; inset:0; background:#000;
+    display:none; align-items:center; justify-content:center;
+    z-index:58;
+  }
+  .photo-viewer.open{display:flex;}
+  .photo-viewer-media{width:100%; height:100%;}
+  .photo-viewer-media img, .photo-viewer-media video{width:100%; height:100%; object-fit:contain;}
+  .photo-viewer .story-viewer-close{position:absolute; top:14px; right:10px; z-index:2; background:rgba(0,0,0,0.35); border-radius:50%;}
+
+  /* ---- PERFIL DE OUTRA CONTA ---- */
+  .user-profile-view{
+    position:absolute; inset:0;
+    background:var(--ink-2);
+    display:none;
+    flex-direction:column;
+    z-index:55;
+    overflow-y:auto;
+  }
+  .user-profile-view.open{display:flex;}
+  .upv-head{padding:14px 16px; position:sticky; top:0; z-index:2;}
+  .upv-back{background:rgba(0,0,0,0.25); border:none; color:#fff; font-size:13px; font-weight:600; padding:8px 14px; border-radius:100px; cursor:pointer;}
+  .stat-clickable{cursor:pointer;}
+  .testimonial-form{padding:20px 22px 26px;}
+  .testimonial-item{padding:12px 0; border-bottom:1px solid var(--hair);}
+  .testimonial-item .t-author{font-size:12.5px; font-weight:700; color:var(--lime-soft); margin-bottom:3px;}
+  .testimonial-item .t-content{font-size:13.5px; color:var(--cream); line-height:1.5; font-family:'Fraunces',serif;}
+  .testimonial-pending-row{display:flex; align-items:flex-start; gap:10px; padding:12px 0; border-bottom:1px solid var(--hair);}
+  .testimonial-pending-row .t-content{flex:1; font-size:13px; color:var(--cream-dim); line-height:1.5;}
+  .testimonial-pending-actions{display:flex; gap:6px; flex-shrink:0;}
 
   /* ---- BOTTOM NAV ---- */
   .bottomnav{flex-shrink:0; display:flex; border-top:1px solid var(--hair); background:rgba(18,22,28,0.35); backdrop-filter:blur(6px);}
@@ -494,6 +531,12 @@
       </div>
     </div>
 
+    <!-- COMUNIDADES (em construção) -->
+    <div class="screen" id="screen-comunidades">
+      <div class="app-header"><div class="wordmark" style="font-size:20px;">Comunidades</div></div>
+      <div class="empty-state" style="margin:30px 22px;">Em breve. Aqui vão ficar os grupos e álbuns coletivos que reúnem várias pessoas conectadas.</div>
+    </div>
+
     <!-- PERFIL -->
     <div class="screen" id="screen-profile">
       <div class="cover"></div>
@@ -505,9 +548,14 @@
           <div><div class="stat-num" id="stat-moments">0</div><div class="stat-lbl">Momentos</div></div>
           <div><div class="stat-num" id="stat-connections">0</div><div class="stat-lbl">Convidados</div></div>
           <div><div class="stat-num" id="stat-since">—</div><div class="stat-lbl">Desde</div></div>
+          <div class="stat-clickable" id="own-testimonials-btn"><div class="stat-num" id="stat-testimonials">0</div><div class="stat-lbl">Depoimentos</div></div>
         </div>
       </div>
       <button class="logout-btn" id="logout-btn">Sair da conta</button>
+      <div id="own-testimonials-pending-wrap" style="display:none;">
+        <div class="profile-section-label">Depoimentos recebidos, aguardando sua resposta</div>
+        <div id="own-testimonials-pending" style="padding:0 22px;"></div>
+      </div>
       <div class="profile-section-label">Seus momentos</div>
       <div class="profile-grid" id="profile-grid"></div>
       <div id="profile-empty" class="empty-state" style="display:none; margin:14px 22px 22px;">Você ainda não publicou nenhum momento.</div>
@@ -528,6 +576,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
       <span class="navlbl">Convites</span>
     </button>
+    <button class="navbtn" data-screen="comunidades">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1"/><path d="M15 14.5a4.5 4.5 0 0 1 4.5 4.5v1"/></svg>
+      <span class="navlbl">Comunidades</span>
+    </button>
     <button class="navbtn" data-screen="profile">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       <span class="navlbl">Perfil</span>
@@ -538,7 +590,8 @@
   <div class="story-viewer" id="story-viewer">
     <div class="story-progress-row" id="story-progress-row"></div>
     <div class="story-viewer-head">
-      <div class="story-viewer-who" id="story-viewer-who"></div>
+      <div class="story-viewer-who" id="story-viewer-who" style="cursor:pointer;"></div>
+      <button class="story-viewer-close" id="story-viewer-delete" title="Apagar" style="margin-right:auto; margin-left:8px;">🗑</button>
       <button class="story-viewer-close" id="story-viewer-close">✕</button>
     </div>
     <div class="story-viewer-media" id="story-viewer-media">
@@ -548,19 +601,63 @@
     </div>
   </div>
 
+  <!-- VISUALIZADOR DE FOTO/VÍDEO DE UM POST (tela cheia) -->
+  <div class="photo-viewer" id="photo-viewer">
+    <button class="story-viewer-close" id="photo-viewer-close">✕</button>
+    <div class="photo-viewer-media" id="photo-viewer-media"></div>
+  </div>
+
+  <!-- PERFIL DE OUTRA CONTA (ao clicar no nome de uma conexão) -->
+  <div class="user-profile-view" id="user-profile-view">
+    <div class="upv-head">
+      <button class="upv-back" id="upv-close">← Voltar</button>
+    </div>
+    <div class="upv-body">
+      <div class="cover"></div>
+      <div class="profile-head">
+        <div class="avatar-circle profile-avatar" id="upv-avatar"></div>
+        <div class="profile-name" id="upv-name"></div>
+        <div class="profile-bio" id="upv-bio"></div>
+        <div class="stat-row">
+          <div><div class="stat-num" id="upv-since">—</div><div class="stat-lbl">Desde</div></div>
+          <div class="stat-clickable" id="upv-testimonials-btn"><div class="stat-num" id="upv-test-count">0</div><div class="stat-lbl">Depoimentos</div></div>
+        </div>
+      </div>
+      <div class="testimonial-form" id="upv-testimonial-form">
+        <div class="field-label">Deixar um depoimento</div>
+        <textarea class="field-input" id="upv-testimonial-input" placeholder="Escreva algo bonito sobre essa pessoa..."></textarea>
+        <button class="submit-btn" id="upv-testimonial-submit">Enviar depoimento</button>
+        <div class="plan-note">A pessoa precisa aceitar pra ele aparecer no perfil dela.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: LISTA DE DEPOIMENTOS -->
+  <div class="modal-overlay" id="modal-testimonials">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title" id="testimonials-modal-title">Depoimentos</div>
+        <button class="modal-close" data-close="modal-testimonials">✕</button>
+      </div>
+      <div id="testimonials-list"></div>
+    </div>
+  </div>
+
   <!-- MODAL: NOVO POST -->
   <div class="modal-overlay" id="modal-post">
     <div class="modal-sheet">
       <div class="modal-head">
-        <div class="modal-title">Novo momento</div>
+        <div class="modal-title" id="post-modal-title">Novo momento</div>
         <button class="modal-close" data-close="modal-post">✕</button>
       </div>
-      <div class="file-drop" id="post-drop">
-        <span id="post-drop-label">Toque para escolher fotos ou vídeos</span>
-        <input type="file" id="post-file-input" accept="image/*,video/*" multiple>
+      <div id="post-file-drop-wrap">
+        <div class="file-drop" id="post-drop">
+          <span id="post-drop-label">Toque para escolher fotos ou vídeos</span>
+          <input type="file" id="post-file-input" accept="image/*,video/*" multiple>
+        </div>
+        <div class="preview-row" id="post-preview-row"></div>
+        <div class="plan-note" id="post-limit-note">Seu plano permite até 5 fotos/vídeos por post.</div>
       </div>
-      <div class="preview-row" id="post-preview-row"></div>
-      <div class="plan-note" id="post-limit-note">Seu plano permite até 5 fotos/vídeos por post.</div>
 
       <div class="field-label">Data</div>
       <input class="field-input" type="date" id="post-date">
@@ -631,10 +728,24 @@ async function fetchProfiles(){
   }));
 }
 
+let pendingSent = new Map();     // otherId -> row id (convite que EU enviei, aguardando aceite)
+let pendingReceived = new Map(); // otherId -> row id (convite que ME enviaram, aguardando minha resposta)
+
 async function fetchConnections(){
   const { data, error } = await sb.from('connections').select('*');
   if (error) { console.error(error); return; }
-  connections = new Set((data || []).map(c => connKey(c.user_a, c.user_b)));
+  connections = new Set();
+  pendingSent = new Map();
+  pendingReceived = new Map();
+  (data || []).forEach(c => {
+    if (c.status === 'accepted') {
+      connections.add(connKey(c.requester_id, c.target_id));
+    } else if (c.requester_id === currentUser?.id) {
+      pendingSent.set(c.target_id, c.id);
+    } else if (c.target_id === currentUser?.id) {
+      pendingReceived.set(c.requester_id, c.id);
+    }
+  });
 }
 
 async function fetchMoments(){
@@ -746,22 +857,23 @@ document.getElementById('form-login').addEventListener('submit', async (e)=>{
   const { error } = await sb.auth.signInWithPassword({ email, password: senha });
   btn.disabled = false; btn.textContent = 'Entrar';
   if (error) { err.textContent = 'E-mail ou senha incorretos.'; return; }
-  err.textContent = '';
-  await enterAppAfterAuth();
+  const ok = await enterAppAfterAuth();
+  err.textContent = ok ? '' : 'Essa conta não tem um perfil salvo (provavelmente de uma tentativa de cadastro que falhou). Crie uma conta nova com outro e-mail, ou apague esse usuário no painel do Supabase e cadastre de novo.';
 });
 
 async function enterAppAfterAuth(){
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) return;
+  if (!session) return false;
   await fetchProfiles();
   currentUser = users.find(u => u.id === session.user.id);
-  if (!currentUser) return; // perfil ainda não existe (raro)
+  if (!currentUser) return false; // perfil ainda não existe
   document.getElementById('auth-view').style.display = 'none';
   document.getElementById('app-screens').style.display = '';
   document.getElementById('bottomnav').style.display = '';
   document.getElementById('login-email').value = '';
   document.getElementById('login-password').value = '';
   await syncAll();
+  return true;
 }
 
 document.getElementById('logout-btn').addEventListener('click', async ()=>{
@@ -807,6 +919,13 @@ function visibleMoments(){
       m.taggedIds.includes(currentUser.id) ||
       connections.has(connKey(currentUser.id, m.authorId))
     )
+    .sort((a,b) => b.date.localeCompare(a.date));
+}
+
+// Busca só mostra o que é seu ou o que te marcaram — não os posts de conexões em geral
+function searchableMoments(){
+  if (!currentUser) return [];
+  return moments.filter(m => m.authorId === currentUser.id || m.taggedIds.includes(currentUser.id))
     .sort((a,b) => b.date.localeCompare(a.date));
 }
 
@@ -887,6 +1006,8 @@ function showStoryItem(idx){
   if (item.caption) { cap.textContent = item.caption; cap.style.display = 'block'; }
   else { cap.style.display = 'none'; }
 
+  document.getElementById('story-viewer-delete').style.display = (item.authorId === currentUser.id) ? 'inline-block' : 'none';
+
   const segs = document.querySelectorAll('#story-progress-row .story-progress-seg');
   segs.forEach((seg, i) => {
     seg.classList.remove('active','done');
@@ -927,6 +1048,58 @@ function closeStoryViewer(){
 document.getElementById('story-viewer-close').addEventListener('click', closeStoryViewer);
 document.getElementById('story-tap-next').addEventListener('click', nextStoryItem);
 document.getElementById('story-tap-prev').addEventListener('click', prevStoryItem);
+document.getElementById('story-viewer-delete').addEventListener('click', deleteCurrentStoryItem);
+document.getElementById('story-viewer-who').addEventListener('click', ()=>{
+  if (viewerState) openUserProfile(viewerState.items[viewerState.index].authorId);
+});
+
+/* ---- Visualizador simples de foto/vídeo de um post (tela cheia) ---- */
+function openPhotoViewer(momentId){
+  const m = moments.find(x => x.id === momentId);
+  if (!m) return;
+  const media = document.getElementById('photo-viewer-media');
+  media.innerHTML = m.isVideo ? `<video src="${m.mediaUrl}" controls autoplay></video>` : `<img src="${m.mediaUrl}">`;
+  document.getElementById('photo-viewer').classList.add('open');
+}
+document.getElementById('photo-viewer-close').addEventListener('click', ()=>{
+  document.getElementById('photo-viewer').classList.remove('open');
+  document.getElementById('photo-viewer-media').innerHTML = '';
+});
+
+/* ---- Editar / apagar posts ---- */
+let editingMomentId = null;
+
+function openEditPost(momentId){
+  const m = moments.find(x => x.id === momentId);
+  if (!m) return;
+  editingMomentId = momentId;
+  document.getElementById('post-modal-title').textContent = 'Editar momento';
+  document.getElementById('post-submit').textContent = 'Salvar alterações';
+  document.getElementById('post-date').value = m.date;
+  document.getElementById('post-place').value = m.place || '';
+  document.getElementById('post-subject').value = m.subject || '';
+  document.getElementById('post-caption').value = m.caption || '';
+  document.getElementById('post-file-drop-wrap').style.display = 'none';
+  renderPeopleSelect(m.taggedIds);
+  document.getElementById('post-submit').disabled = false;
+  openModal('modal-post', true);
+}
+
+async function deleteMoment(momentId){
+  if (!confirm('Apagar esse momento? Essa ação não pode ser desfeita.')) return;
+  await sb.from('moments').delete().eq('id', momentId);
+  await syncAll();
+}
+
+async function deleteCurrentStoryItem(){
+  if (!viewerState) return;
+  const item = viewerState.items[viewerState.index];
+  if (item.authorId !== currentUser.id) return;
+  if (!confirm('Apagar esse momento de 24h?')) return;
+  await sb.from('stories').delete().eq('id', item.id);
+  closeStoryViewer();
+  await syncAll();
+}
 
 
 function renderTimeline(){
@@ -936,19 +1109,25 @@ function renderTimeline(){
   const mine = visibleMoments();
   document.getElementById('timeline-empty').style.display = mine.length ? 'none' : 'block';
 
-  mine.forEach(m => {
+  // insere sempre logo após o trilho — por isso percorremos do mais antigo pro mais recente,
+  // assim o mais recente é o último a ser inserido e fica no topo
+  [...mine].reverse().forEach(m => {
     const author = users.find(u => u.id === m.authorId);
     const taggedNames = m.taggedIds.map(id => users.find(u=>u.id===id)?.nome).filter(Boolean);
+    const isMine = m.authorId === currentUser.id;
     const frame = document.createElement('div');
     frame.className = 'frame';
+    frame.dataset.id = m.id;
     frame.innerHTML = `
       <div class="hole"></div>
       <div class="date-tag">${m.dateLabel}${m.place ? ' · ' + m.place.toUpperCase() : ''}</div>
       <div class="card">
-        ${m.isVideo ? `<video src="${m.mediaUrl}" muted controls></video>` : `<img src="${m.mediaUrl}" alt="momento">`}
+        <div class="card-media" data-open-photo="${m.id}">
+          ${m.isVideo ? `<video src="${m.mediaUrl}" muted></video>` : `<img src="${m.mediaUrl}" alt="momento">`}
+        </div>
         <div class="body">
           <div class="tags">
-            ${author && author.id !== currentUser.id ? `<span class="tag people">por ${author.nome}</span>` : ''}
+            ${author && !isMine ? `<span class="tag people" data-open-profile-tag="${author.id}" style="cursor:pointer;">por ${author.nome}</span>` : ''}
             ${taggedNames.length ? `<span class="tag people">com ${taggedNames.join(', ')}</span>` : ''}
             <span class="tag">${m.subject}</span>
             ${m.extraCount ? `<span class="tag">+${m.extraCount}</span>` : ''}
@@ -956,12 +1135,28 @@ function renderTimeline(){
           <div class="caption">${m.caption || 'Sem legenda.'}</div>
           <div class="foot">
             <span class="place">${m.place || ''}</span>
-            <button class="share-btn">↗ Compartilhar história</button>
+            <div class="foot-actions">
+              ${isMine ? `<button class="icon-btn" data-edit="${m.id}" title="Editar">✎</button><button class="icon-btn" data-delete="${m.id}" title="Apagar">🗑</button>` : ''}
+              <button class="share-btn">↗ Compartilhar história</button>
+            </div>
           </div>
         </div>
       </div>
     `;
     rail.insertAdjacentElement('afterend', frame);
+  });
+
+  filmstrip.querySelectorAll('[data-open-photo]').forEach(el=>{
+    el.addEventListener('click', ()=> openPhotoViewer(el.dataset.openPhoto));
+  });
+  filmstrip.querySelectorAll('[data-edit]').forEach(el=>{
+    el.addEventListener('click', ()=> openEditPost(el.dataset.edit));
+  });
+  filmstrip.querySelectorAll('[data-delete]').forEach(el=>{
+    el.addEventListener('click', ()=> deleteMoment(el.dataset.delete));
+  });
+  filmstrip.querySelectorAll('[data-open-profile-tag]').forEach(el=>{
+    el.addEventListener('click', ()=> openUserProfile(el.dataset.openProfileTag));
   });
 }
 
@@ -997,7 +1192,7 @@ searchInput.addEventListener('input', renderSearch);
 [yearSelect, monthSelect, daySelect].forEach(sel => sel.addEventListener('change', renderSearch));
 
 function populateDateSelects(){
-  const years = Array.from(new Set(visibleMoments().map(m => m.date.slice(0,4)))).sort().reverse();
+  const years = Array.from(new Set(searchableMoments().map(m => m.date.slice(0,4)))).sort().reverse();
   const curYear = yearSelect.value;
   yearSelect.innerHTML = '<option value="">Ano</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
   yearSelect.value = years.includes(curYear) ? curYear : '';
@@ -1016,7 +1211,7 @@ function norm(s){ return (s||'').toString().toLowerCase(); }
 
 function renderSearch(){
   if (!currentUser) return;
-  const pool = visibleMoments();
+  const pool = searchableMoments();
   let filtered;
 
   if (activeField === 'date') {
@@ -1057,29 +1252,75 @@ function renderInvites(){
     list.innerHTML = '<div class="note">Você ainda é a única conta cadastrada. Crie uma segunda conta (saia e cadastre outra) pra poder convidar e marcar nos seus momentos.</div>';
     return;
   }
-  list.innerHTML = others.map(u=>{
-    const connected = connections.has(connKey(currentUser.id, u.id));
-    return `
+
+  const received = others.filter(u => pendingReceived.has(u.id));
+  const rest = others.filter(u => !pendingReceived.has(u.id));
+
+  const receivedHTML = received.length ? `
+    <div class="section-title">Convites recebidos</div>
+    ${received.map(u => `
       <div class="person-row">
         ${avatarHTML(u.nome, 42)}
         <div>
-          <div class="person-name">${u.nome}</div>
-          <div class="person-sub">@${u.usuario}</div>
+          <div class="person-name" data-open-profile="${u.id}">${u.nome}</div>
+          <div class="person-sub">@${u.usuario} · quer se conectar</div>
         </div>
-        <button class="accept-btn ${connected ? 'connected' : ''}" data-id="${u.id}">${connected ? 'Conectado ✓' : 'Convidar'}</button>
+        <button class="accept-btn" data-accept="${u.id}">Aceitar</button>
+        <button class="icon-btn" data-decline="${u.id}" title="Recusar">✕</button>
       </div>
-    `;
-  }).join('');
-  list.querySelectorAll('.accept-btn').forEach(btn=>{
+    `).join('')}
+  ` : '';
+
+  const restHTML = `
+    <div class="section-title">Contas cadastradas</div>
+    ${rest.map(u=>{
+      const connected = connections.has(connKey(currentUser.id, u.id));
+      const sent = pendingSent.has(u.id);
+      const label = connected ? 'Conectado ✓' : (sent ? 'Convite enviado' : 'Convidar');
+      return `
+        <div class="person-row">
+          ${avatarHTML(u.nome, 42)}
+          <div>
+            <div class="person-name" data-open-profile="${u.id}">${u.nome}</div>
+            <div class="person-sub">@${u.usuario}</div>
+          </div>
+          <button class="accept-btn ${(connected||sent) ? 'connected' : ''}" data-toggle="${u.id}" ${sent ? 'disabled' : ''}>${label}</button>
+        </div>
+      `;
+    }).join('')}
+  `;
+
+  list.innerHTML = receivedHTML + restHTML;
+
+  list.querySelectorAll('[data-open-profile]').forEach(el=>{
+    el.addEventListener('click', ()=> openUserProfile(el.dataset.openProfile));
+  });
+  list.querySelectorAll('[data-accept]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       btn.disabled = true;
-      const otherId = btn.dataset.id;
-      const already = connections.has(connKey(currentUser.id, otherId));
-      const [a, b] = [currentUser.id, otherId].sort();
-      if (already) {
-        await sb.from('connections').delete().eq('user_a', a).eq('user_b', b);
+      const rowId = pendingReceived.get(btn.dataset.accept);
+      await sb.from('connections').update({ status: 'accepted' }).eq('id', rowId);
+      await syncAll();
+    });
+  });
+  list.querySelectorAll('[data-decline]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      btn.disabled = true;
+      const rowId = pendingReceived.get(btn.dataset.decline);
+      await sb.from('connections').delete().eq('id', rowId);
+      await syncAll();
+    });
+  });
+  list.querySelectorAll('[data-toggle]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const otherId = btn.dataset.toggle;
+      const connected = connections.has(connKey(currentUser.id, otherId));
+      btn.disabled = true;
+      if (connected) {
+        await sb.from('connections').delete()
+          .or(`and(requester_id.eq.${currentUser.id},target_id.eq.${otherId}),and(requester_id.eq.${otherId},target_id.eq.${currentUser.id})`);
       } else {
-        await sb.from('connections').insert({ user_a: a, user_b: b });
+        await sb.from('connections').insert({ requester_id: currentUser.id, target_id: otherId, status: 'pending' });
       }
       await syncAll();
     });
@@ -1087,7 +1328,7 @@ function renderInvites(){
 }
 
 /* ================= PERFIL ================= */
-function renderProfile(){
+async function renderProfile(){
   if (!currentUser) return;
   document.getElementById('profile-avatar').outerHTML = avatarHTML(currentUser.nome, 82).replace('avatar-circle', 'avatar-circle profile-avatar').replace('<div', '<div id="profile-avatar"');
   document.getElementById('profile-name').textContent = currentUser.nome;
@@ -1104,32 +1345,146 @@ function renderProfile(){
       ${m.isVideo ? `<video src="${m.mediaUrl}" muted></video>` : `<img src="${m.mediaUrl}">`}
     </div>
   `).join('');
+
+  // Depoimentos: contagem dos aceitos + lista dos pendentes pra você aprovar
+  const { data: accepted } = await sb.from('testimonials').select('id').eq('target_id', currentUser.id).eq('status','accepted');
+  document.getElementById('stat-testimonials').textContent = (accepted || []).length;
+
+  const { data: pending } = await sb.from('testimonials').select('*').eq('target_id', currentUser.id).eq('status','pending');
+  const wrap = document.getElementById('own-testimonials-pending-wrap');
+  const pendingList = document.getElementById('own-testimonials-pending');
+  if (pending && pending.length){
+    wrap.style.display = 'block';
+    pendingList.innerHTML = pending.map(t => {
+      const author = users.find(u=>u.id===t.author_id);
+      return `
+        <div class="testimonial-pending-row">
+          <div class="t-content">"${t.content}" <br><span style="color:var(--lime-soft); font-weight:600;">— ${author ? author.nome : 'alguém'}</span></div>
+          <div class="testimonial-pending-actions">
+            <button class="accept-btn" data-t-accept="${t.id}">Aceitar</button>
+            <button class="icon-btn" data-t-decline="${t.id}" title="Recusar">✕</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    pendingList.querySelectorAll('[data-t-accept]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        btn.disabled = true;
+        await sb.from('testimonials').update({ status:'accepted' }).eq('id', btn.dataset.tAccept);
+        await renderProfile();
+      });
+    });
+    pendingList.querySelectorAll('[data-t-decline]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        btn.disabled = true;
+        await sb.from('testimonials').delete().eq('id', btn.dataset.tDecline);
+        await renderProfile();
+      });
+    });
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+document.getElementById('own-testimonials-btn').addEventListener('click', ()=>{
+  openTestimonialsModal(currentUser.id, currentUser.nome);
+});
+
+/* ================= PERFIL DE OUTRA CONTA ================= */
+async function openUserProfile(userId){
+  const u = users.find(x => x.id === userId);
+  if (!u) return;
+  document.getElementById('upv-avatar').outerHTML = avatarHTML(u.nome, 82).replace('avatar-circle', 'avatar-circle profile-avatar').replace('<div', '<div id="upv-avatar"');
+  document.getElementById('upv-name').textContent = u.nome;
+  document.getElementById('upv-bio').textContent = `@${u.usuario}`;
+  document.getElementById('upv-since').textContent = u.criadoEm.getFullYear();
+  document.getElementById('upv-testimonials-btn').onclick = () => openTestimonialsModal(u.id, u.nome);
+
+  const { data: accepted } = await sb.from('testimonials').select('id').eq('target_id', u.id).eq('status','accepted');
+  document.getElementById('upv-test-count').textContent = (accepted || []).length;
+
+  const formWrap = document.getElementById('upv-testimonial-form');
+  if (u.id === currentUser.id) {
+    formWrap.style.display = 'none';
+  } else {
+    formWrap.style.display = 'block';
+    document.getElementById('upv-testimonial-input').value = '';
+    document.getElementById('upv-testimonial-submit').onclick = async () => {
+      const content = document.getElementById('upv-testimonial-input').value.trim();
+      if (!content) return;
+      const btn = document.getElementById('upv-testimonial-submit');
+      btn.disabled = true; btn.textContent = 'Enviando...';
+      await sb.from('testimonials').insert({ author_id: currentUser.id, target_id: u.id, content, status: 'pending' });
+      btn.disabled = false; btn.textContent = 'Enviar depoimento';
+      document.getElementById('upv-testimonial-input').value = '';
+      alert('Depoimento enviado! Ele só aparece no perfil depois que a pessoa aceitar.');
+    };
+  }
+
+  document.getElementById('user-profile-view').classList.add('open');
+}
+document.getElementById('upv-close').addEventListener('click', ()=>{
+  document.getElementById('user-profile-view').classList.remove('open');
+});
+
+async function openTestimonialsModal(userId, nome){
+  document.getElementById('testimonials-modal-title').textContent = `Depoimentos de ${nome}`;
+  const list = document.getElementById('testimonials-list');
+  list.innerHTML = '<div class="plan-note">Carregando...</div>';
+  const { data } = await sb.from('testimonials').select('*').eq('target_id', userId).eq('status','accepted').order('created_at',{ascending:false});
+  list.innerHTML = (data && data.length) ? data.map(t => {
+    const author = users.find(u=>u.id===t.author_id);
+    return `
+      <div class="testimonial-item">
+        <div class="t-author">${author ? author.nome : 'alguém'}</div>
+        <div class="t-content">"${t.content}"</div>
+      </div>
+    `;
+  }).join('') : '<div class="plan-note">Nenhum depoimento por aqui ainda.</div>';
+  openModal('modal-testimonials');
 }
 
 /* ================= MODAIS ================= */
-function openModal(id){
-  if (id === 'modal-post') renderPeopleSelect();
+function openModal(id, skipPeopleReset){
+  if (id === 'modal-post' && !skipPeopleReset) renderPeopleSelect();
   document.getElementById(id).classList.add('open');
 }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+  if (id === 'modal-post') resetPostModalToCreateMode();
+}
+function resetPostModalToCreateMode(){
+  editingMomentId = null;
+  document.getElementById('post-modal-title').textContent = 'Novo momento';
+  document.getElementById('post-submit').textContent = 'Publicar';
+  document.getElementById('post-file-drop-wrap').style.display = 'block';
+}
 document.getElementById('post-fab-btn').addEventListener('click', ()=>{
+  resetPostModalToCreateMode();
   document.getElementById('post-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('post-place').value = '';
+  document.getElementById('post-subject').value = '';
+  document.getElementById('post-caption').value = '';
+  document.getElementById('post-preview-row').innerHTML = '';
+  document.getElementById('post-drop-label').textContent = 'Toque para escolher fotos ou vídeos';
+  postFiles = [];
+  document.getElementById('post-submit').disabled = true;
   openModal('modal-post');
 });
 document.querySelectorAll('.modal-close').forEach(btn=> btn.addEventListener('click', ()=> closeModal(btn.dataset.close)));
-document.querySelectorAll('.modal-overlay').forEach(ov=> ov.addEventListener('click', (e)=>{ if (e.target===ov) ov.classList.remove('open'); }));
+document.querySelectorAll('.modal-overlay').forEach(ov=> ov.addEventListener('click', (e)=>{ if (e.target===ov) closeModal(ov.id); }));
 
 let selectedTagIds = new Set();
-function renderPeopleSelect(){
+function renderPeopleSelect(preselectedIds){
   const wrap = document.getElementById('post-people-select');
-  selectedTagIds = new Set();
+  selectedTagIds = new Set(preselectedIds || []);
   const others = users.filter(u => u.id !== currentUser.id && connections.has(connKey(currentUser.id, u.id)));
   if (!others.length){
     wrap.innerHTML = '<div class="plan-note">Você ainda não está conectado(a) com ninguém — convide alguém na aba Convites pra poder marcá-la aqui.</div>';
     return;
   }
   wrap.innerHTML = others.map(u => `
-    <button type="button" class="tag-select" data-id="${u.id}">${avatarHTML(u.nome,18).replace('avatar-circle','avatar-circle mini-avatar')} ${u.nome}</button>
+    <button type="button" class="tag-select ${selectedTagIds.has(u.id) ? 'on' : ''}" data-id="${u.id}">${avatarHTML(u.nome,18).replace('avatar-circle','avatar-circle mini-avatar')} ${u.nome}</button>
   `).join('');
   wrap.querySelectorAll('.tag-select').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -1164,20 +1519,32 @@ document.getElementById('post-file-input').addEventListener('change', (e)=>{
 });
 
 document.getElementById('post-submit').addEventListener('click', async ()=>{
-  if (!postFiles.length) return;
   const btn = document.getElementById('post-submit');
-  btn.disabled = true; btn.textContent = 'Publicando...';
-
   const dateVal = document.getElementById('post-date').value || new Date().toISOString().slice(0,10);
   const place = document.getElementById('post-place').value.trim();
   const subject = document.getElementById('post-subject').value.trim() || 'Momento';
   const caption = document.getElementById('post-caption').value.trim();
 
+  if (editingMomentId) {
+    btn.disabled = true; btn.textContent = 'Salvando...';
+    const { error } = await sb.from('moments').update({
+      date: dateVal, place, subject, caption, tagged_ids: Array.from(selectedTagIds)
+    }).eq('id', editingMomentId);
+    if (error) { alert('Falha ao salvar: ' + error.message); btn.disabled = false; btn.textContent = 'Salvar alterações'; return; }
+    await syncAll();
+    btn.disabled = false;
+    closeModal('modal-post');
+    return;
+  }
+
+  if (!postFiles.length) return;
+  btn.disabled = true; btn.textContent = 'Publicando...';
+
   const media = [];
   for (const file of postFiles) {
     const path = `${currentUser.id}/${crypto.randomUUID()}-${file.name}`;
     const { error: upErr } = await sb.storage.from(BUCKET).upload(path, file);
-    if (upErr) { alert('Falha ao enviar arquivo: ' + upErr.message); btn.disabled = false; btn.textContent = 'Publicar'; return; }
+    if (upErr) { alert('Falha ao enviar arquivo: ' + upErr.message + (upErr.statusCode ? ' (código ' + upErr.statusCode + ')' : '')); btn.disabled = false; btn.textContent = 'Publicar'; return; }
     media.push({ path, isVideo: file.type.startsWith('video') });
   }
 
