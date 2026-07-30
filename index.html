@@ -72,6 +72,23 @@
     color:var(--cream-dim);
     letter-spacing:0.02em;
   }
+
+  /* Em tela de celular de verdade (ou instalado como PWA), tira a moldura de "prévia" —
+     sem isso, fica um celular falso dentro do celular real, com barra de status duplicada. */
+  @media (max-width: 520px), (display-mode: standalone) {
+    body{ padding:0; }
+    .phone{
+      width:100%;
+      max-width:100%;
+      height:100vh;
+      height:100dvh;
+      border-radius:0;
+      border:none;
+      box-shadow:none;
+    }
+    .status{ display:none; }
+  }
+
   .screens{
     flex:1;
     position:relative;
