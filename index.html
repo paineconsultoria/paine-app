@@ -144,7 +144,7 @@
   .stories-bar{
     display:flex;
     gap:0;
-    padding:4px 18px 20px;
+    padding:4px 18px 20px 0;
     overflow-x:auto;
   }
   .stories-bar::-webkit-scrollbar{display:none;}
@@ -154,17 +154,17 @@
     align-items:center;
     gap:4px;
     flex-shrink:0;
-    width:66px;
+    width:56px;
     position:relative;
   }
   .story-tri-item{
     position:relative;
-    width:70px; height:64px;
+    width:58px; height:52px;
     flex-shrink:0;
   }
-  .story-tri-item.overlap{margin-left:-15px;}
+  .story-tri-item.overlap{margin-left:-12px;}
   .story-triangle{
-    width:70px; height:64px;
+    width:58px; height:52px;
     padding:0;
     position:absolute; top:0; left:0;
     clip-path: polygon(21% 0%, 100% 0%, 79% 100%, 0% 100%);
@@ -172,11 +172,17 @@
     filter: drop-shadow(0 0 0.5px #fff) drop-shadow(0 0 0.5px #fff);
     z-index:1;
   }
+  .story-triangle.flush-left{
+    clip-path: polygon(0% 0%, 100% 0%, 79% 100%, 0% 100%);
+  }
   .story-triangle .tri-inner{
     width:100%; height:100%;
     overflow:hidden;
     background:var(--paper-2);
     clip-path: polygon(21% 0%, 100% 0%, 79% 100%, 0% 100%);
+  }
+  .story-triangle.flush-left .tri-inner{
+    clip-path: polygon(0% 0%, 100% 0%, 79% 100%, 0% 100%);
   }
   .tri-inner img, .tri-inner video{width:100%; height:100%; object-fit:cover; display:block;}
   .story-add{
@@ -190,7 +196,7 @@
   .story-add .plus{
     font-size:22px; color:var(--text-fade); font-weight:300;
   }
-  .story-lbl{font-size:10px; color:var(--cream-dim); max-width:64px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .story-lbl{font-size:10px; color:var(--cream-dim); max-width:56px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .story-tri-item .story-lbl{
     position:absolute; left:50%; transform:translateX(-50%);
     bottom:-18px; z-index:2;
@@ -651,6 +657,7 @@
         </div>
         <div class="profile-name" id="profile-name"></div>
         <div class="profile-bio" id="profile-bio"></div>
+        <button class="accept-btn" id="edit-profile-btn" style="margin-top:8px;">Editar perfil</button>
         <div class="stat-row">
           <div><div class="stat-num" id="stat-moments">0</div><div class="stat-lbl">Momentos</div></div>
           <div><div class="stat-num" id="stat-connections">0</div><div class="stat-lbl">Convidados</div></div>
@@ -717,6 +724,26 @@
       <div class="profile-section-label">Momentos</div>
       <div class="profile-grid" id="upv-grid"></div>
       <div id="upv-empty" class="empty-state" style="display:none; margin:14px 22px 22px;">Nenhum momento visível pra você por aqui.</div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITAR PERFIL -->
+  <div class="modal-overlay" id="modal-edit-profile">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Editar perfil</div>
+        <button class="modal-close" data-close="modal-edit-profile">✕</button>
+      </div>
+      <div class="field-label">Nome completo</div>
+      <input class="field-input" type="text" id="edit-nome">
+      <div class="field-label">Nome de usuário</div>
+      <input class="field-input" type="text" id="edit-usuario">
+      <div class="field-label">Telefone</div>
+      <input class="field-input" type="tel" id="edit-telefone">
+      <div class="field-label">Data de nascimento</div>
+      <input class="field-input" type="date" id="edit-nascimento">
+      <div class="auth-error" id="edit-profile-error"></div>
+      <button class="submit-btn" id="edit-profile-submit">Salvar alterações</button>
     </div>
   </div>
 
@@ -1105,13 +1132,15 @@ function renderStories(){
   friendGroups.forEach(g => groups.push({ authorId: g.user.id, name: g.user.nome.split(' ')[0], items: g.items }));
 
   bar.innerHTML = `
-    <div class="story">
-      <div class="story-add" id="story-add-btn"><span class="plus">+</span></div>
-      <div class="story-lbl">Seu momento</div>
+    <div class="story-tri-item">
+      <div class="story-triangle flush-left" id="story-add-btn" style="background:var(--paper-2); display:flex; align-items:center; justify-content:center;">
+        <span class="plus" style="font-size:20px; color:var(--text-fade); font-weight:300;">+</span>
+      </div>
+      <div class="story-lbl">Você</div>
     </div>
     ${groups.map((g, i) => {
       const cover = g.items[g.items.length - 1];
-      const itemClasses = ['story-tri-item', i > 0 ? 'overlap' : ''].filter(Boolean).join(' ');
+      const itemClasses = ['story-tri-item', 'overlap'].join(' ');
       return `
         <div class="${itemClasses}" data-author="${g.authorId}">
           <div class="story-triangle">
@@ -1554,6 +1583,34 @@ async function renderProfile(){
 
 document.getElementById('own-testimonials-btn').addEventListener('click', ()=>{
   openTestimonialsModal(currentUser.id, currentUser.nome);
+});
+
+document.getElementById('edit-profile-btn').addEventListener('click', ()=>{
+  document.getElementById('edit-nome').value = currentUser.nome || '';
+  document.getElementById('edit-usuario').value = currentUser.usuario || '';
+  document.getElementById('edit-telefone').value = currentUser.telefone || '';
+  document.getElementById('edit-nascimento').value = currentUser.nascimento || '';
+  document.getElementById('edit-profile-error').textContent = '';
+  openModal('modal-edit-profile');
+});
+
+document.getElementById('edit-profile-submit').addEventListener('click', async ()=>{
+  const nome = document.getElementById('edit-nome').value.trim();
+  const usuario = document.getElementById('edit-usuario').value.trim();
+  const telefone = document.getElementById('edit-telefone').value.trim();
+  const nascimento = document.getElementById('edit-nascimento').value || null;
+  const err = document.getElementById('edit-profile-error');
+  const btn = document.getElementById('edit-profile-submit');
+
+  if (!nome || !usuario) { err.textContent = 'Nome e nome de usuário não podem ficar vazios.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  const { error } = await sb.from('profiles').update({ nome, usuario, telefone, nascimento }).eq('id', currentUser.id);
+  btn.disabled = false; btn.textContent = 'Salvar alterações';
+  if (error) { err.textContent = 'Falha ao salvar: ' + error.message; return; }
+
+  await syncAll();
+  closeModal('modal-edit-profile');
 });
 
 /* ================= PERFIL DE OUTRA CONTA ================= */
