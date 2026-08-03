@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
 <title>Paine</title>
 
 <!-- PWA: Android -->
@@ -87,6 +87,7 @@
       box-shadow:none;
     }
     .status{ display:none; }
+    .upload-fab{ position:fixed; }
   }
 
   .screens{
@@ -472,6 +473,19 @@
   .bottomnav{display:flex; border-bottom:1px solid var(--hair); background:none;}
   .navbtn{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 0 10px; background:none; border:none; cursor:pointer; color:var(--cream-dim);}
   .navbtn.active{color:var(--lime-soft);}
+  .nav-badge{
+    position:absolute; top:2px; right:calc(50% - 18px);
+    width:8px; height:8px; border-radius:50%;
+    background:#e0554f; border:1.5px solid var(--ink-2);
+  }
+  .invites-banner{
+    margin:0 18px 14px; padding:11px 14px;
+    background:rgba(159,201,58,0.14); border:1px solid rgba(159,201,58,0.35);
+    border-radius:12px; display:flex; align-items:center; justify-content:space-between;
+    gap:10px; cursor:pointer;
+  }
+  .invites-banner span{font-size:12.5px; color:var(--lime-soft); font-weight:600;}
+  .invites-banner .arrow{color:var(--lime-soft); font-size:14px;}
   .navbtn svg{width:20px; height:20px;}
   .navlbl{font-size:9.5px; font-weight:600; letter-spacing:0.02em;}
 </style>
@@ -519,7 +533,7 @@
       <input class="field-input" type="text" id="cad-nome" placeholder="Seu nome completo">
 
       <div class="field-label">Nome de usuário</div>
-      <input class="field-input" type="text" id="cad-usuario" placeholder="@usuario">
+      <input class="field-input" type="text" id="cad-usuario" placeholder="usuario">
 
       <div class="field-label">E-mail</div>
       <input class="field-input" type="email" id="cad-email" placeholder="voce@email.com">
@@ -562,6 +576,7 @@
       </div>
 
       <div class="stories-bar" id="stories-bar"></div>
+      <div id="invites-banner" class="invites-banner" style="display:none;"></div>
 
     <div class="bottomnav" id="bottomnav">
       <button class="navbtn active" data-screen="timeline">
@@ -572,13 +587,18 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <span class="navlbl">Buscar</span>
       </button>
-      <button class="navbtn" data-screen="invites">
+      <button class="navbtn" data-screen="invites" style="position:relative;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
         <span class="navlbl">Convites</span>
+        <span id="invites-nav-badge" class="nav-badge" style="display:none;"></span>
       </button>
       <button class="navbtn" data-screen="comunidades">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1"/><path d="M15 14.5a4.5 4.5 0 0 1 4.5 4.5v1"/></svg>
         <span class="navlbl">Comunidades</span>
+      </button>
+      <button class="navbtn" data-screen="servicos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a5 5 0 0 0-5 5c0 2.5 2 3.5 2 6h6c0-2.5 2-3.5 2-6a5 5 0 0 0-5-5z"/><path d="M9 18h6M10 21h4"/></svg>
+        <span class="navlbl">Serviços</span>
       </button>
       <button class="navbtn" data-screen="profile">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -630,17 +650,36 @@
       </div>
       <div class="invites-wrap">
         <div class="note">Aqui ninguém segue por acaso. Convide as contas que você criou pra poder marcá-las nos seus momentos e ver as recordações de vocês juntos na busca.</div>
-        <div class="section-title">Contas cadastradas</div>
+        <div class="search-bar" style="margin-top:14px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c7d6e6" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input type="text" id="invites-search-input" placeholder="Buscar por nome ou @usuário...">
+        </div>
         <div id="people-list"></div>
       </div>
     </div>
 
-    <!-- COMUNIDADES (em construção) -->
+    <!-- COMUNIDADES -->
     <div class="screen" id="screen-comunidades">
       <div class="screen-sticky-top">
       <div class="app-header"><div class="wordmark" style="font-size:20px;">Comunidades</div></div>
       </div>
-      <div class="empty-state" style="margin:30px 22px;">Em breve. Aqui vão ficar os grupos e álbuns coletivos que reúnem várias pessoas conectadas.</div>
+      <div class="invites-wrap">
+        <div class="note">Comunidades reúnem quem curte a mesma coisa — um time, um hobby, o que for. Crie uma ou entre em uma que já existe.</div>
+        <div class="search-bar" style="margin-top:14px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c7d6e6" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input type="text" id="communities-search-input" placeholder="Buscar comunidades...">
+        </div>
+        <button class="accept-btn" id="create-community-btn" style="margin-top:14px; width:100%; padding:12px;">+ Criar comunidade</button>
+        <div id="communities-list" style="margin-top:16px;"></div>
+      </div>
+    </div>
+
+    <!-- SERVIÇOS (em construção) -->
+    <div class="screen" id="screen-servicos">
+      <div class="screen-sticky-top">
+        <div class="app-header"><div class="wordmark" style="font-size:20px;">Serviços</div></div>
+      </div>
+      <div class="empty-state" style="margin:30px 22px;">Em breve. Aqui vão ficar serviços de bem-estar e saúde — psicólogos, nutricionistas, educadores físicos e outros profissionais.</div>
     </div>
 
     <!-- PERFIL -->
@@ -658,11 +697,16 @@
         <div class="profile-name" id="profile-name"></div>
         <div class="profile-bio" id="profile-bio"></div>
         <button class="accept-btn" id="edit-profile-btn" style="margin-top:8px;">Editar perfil</button>
+        <button class="accept-btn connected" id="change-password-btn" style="margin-top:8px;">Trocar senha</button>
         <div class="stat-row">
           <div><div class="stat-num" id="stat-moments">0</div><div class="stat-lbl">Momentos</div></div>
           <div><div class="stat-num" id="stat-connections">0</div><div class="stat-lbl">Convidados</div></div>
           <div><div class="stat-num" id="stat-since">—</div><div class="stat-lbl">Desde</div></div>
           <div class="stat-clickable" id="own-testimonials-btn"><div class="stat-num" id="stat-testimonials">0</div><div class="stat-lbl">Depoimentos</div></div>
+        </div>
+        <div class="stat-row" style="border-bottom:none; padding-bottom:0;">
+          <div class="stat-clickable" id="own-communities-owner-btn"><div class="stat-num" id="stat-communities-owner">0</div><div class="stat-lbl">Comunidades (dono)</div></div>
+          <div class="stat-clickable" id="own-communities-member-btn"><div class="stat-num" id="stat-communities-member">0</div><div class="stat-lbl">Comunidades (membro)</div></div>
         </div>
       </div>
       <button class="logout-btn" id="logout-btn">Sair da conta</button>
@@ -714,6 +758,10 @@
           <div><div class="stat-num" id="upv-since">—</div><div class="stat-lbl">Desde</div></div>
           <div class="stat-clickable" id="upv-testimonials-btn"><div class="stat-num" id="upv-test-count">0</div><div class="stat-lbl">Depoimentos</div></div>
         </div>
+        <div class="stat-row" style="border-bottom:none; padding-bottom:0;">
+          <div class="stat-clickable" id="upv-communities-owner-btn"><div class="stat-num" id="upv-communities-owner-count">0</div><div class="stat-lbl">Comunidades (dono)</div></div>
+          <div class="stat-clickable" id="upv-communities-member-btn"><div class="stat-num" id="upv-communities-member-count">0</div><div class="stat-lbl">Comunidades (membro)</div></div>
+        </div>
       </div>
       <div class="testimonial-form" id="upv-testimonial-form">
         <div class="field-label">Deixar um depoimento</div>
@@ -724,6 +772,52 @@
       <div class="profile-section-label">Momentos</div>
       <div class="profile-grid" id="upv-grid"></div>
       <div id="upv-empty" class="empty-state" style="display:none; margin:14px 22px 22px;">Nenhum momento visível pra você por aqui.</div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVA COMUNIDADE -->
+  <div class="modal-overlay" id="modal-create-community">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Nova comunidade</div>
+        <button class="modal-close" data-close="modal-create-community">✕</button>
+      </div>
+      <div class="file-drop" id="community-photo-drop">
+        <span id="community-photo-label">Toque para escolher uma foto (opcional)</span>
+        <input type="file" id="community-photo-input" accept="image/*">
+      </div>
+      <div class="preview-row" id="community-photo-preview"></div>
+      <div class="field-label">Nome da comunidade</div>
+      <input class="field-input" type="text" id="community-name-input" placeholder="Ex: Eu amo o Palmeiras">
+      <div class="auth-error" id="create-community-error"></div>
+      <button class="submit-btn" id="create-community-submit" disabled>Criar comunidade</button>
+    </div>
+  </div>
+
+  <!-- MODAL: LISTA DE COMUNIDADES (dono ou membro, visto do perfil) -->
+  <div class="modal-overlay" id="modal-communities-list">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title" id="communities-list-modal-title">Comunidades</div>
+        <button class="modal-close" data-close="modal-communities-list">✕</button>
+      </div>
+      <div id="communities-list-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: TROCAR SENHA -->
+  <div class="modal-overlay" id="modal-change-password">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Trocar senha</div>
+        <button class="modal-close" data-close="modal-change-password">✕</button>
+      </div>
+      <div class="field-label">Nova senha</div>
+      <input class="field-input" type="password" id="new-password-input" placeholder="Mínimo 6 caracteres">
+      <div class="field-label">Confirmar nova senha</div>
+      <input class="field-input" type="password" id="new-password-confirm" placeholder="Repita a senha">
+      <div class="auth-error" id="change-password-error"></div>
+      <button class="submit-btn" id="change-password-submit">Salvar nova senha</button>
     </div>
   </div>
 
@@ -865,7 +959,7 @@ async function fetchConnections(){
 }
 
 async function fetchMoments(){
-  const { data, error } = await sb.from('moments').select('*').order('date', { ascending: false });
+  const { data, error } = await sb.from('moments').select('*').order('created_at', { ascending: false });
   if (error) { console.error(error); return; }
   const months = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
   moments = (data || []).map(m => {
@@ -874,7 +968,7 @@ async function fetchMoments(){
     const d = new Date(m.date + 'T00:00:00');
     return {
       id: m.id, authorId: m.author_id, taggedIds: m.tagged_ids || [],
-      date: m.date,
+      date: m.date, createdAt: m.created_at,
       dateLabel: `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`,
       place: m.place, subject: m.subject, caption: m.caption,
       mediaUrl: first.path ? publicUrl(first.path) : '',
@@ -895,9 +989,51 @@ async function fetchStories(){
   }));
 }
 
+let communities = [];      // {id, ownerId, name, photoUrl, createdAt}
+let communityMembers = []; // {id, communityId, userId}
+
+async function fetchCommunities(){
+  const [{ data: comm, error: e1 }, { data: mem, error: e2 }] = await Promise.all([
+    sb.from('communities').select('*').order('created_at', { ascending: false }),
+    sb.from('community_members').select('*')
+  ]);
+  if (e1) { console.error(e1); return; }
+  if (e2) { console.error(e2); return; }
+  communities = (comm || []).map(c => ({
+    id: c.id, ownerId: c.owner_id, name: c.name,
+    photoUrl: c.photo_path ? publicUrl(c.photo_path) : null,
+    createdAt: c.created_at
+  }));
+  communityMembers = (mem || []).map(m => ({ id: m.id, communityId: m.community_id, userId: m.user_id }));
+}
+
+function communityMemberCount(communityId){
+  return communityMembers.filter(m => m.communityId === communityId).length;
+}
+function isCommunityMember(communityId, userId){
+  return communityMembers.some(m => m.communityId === communityId && m.userId === userId);
+}
+
 async function syncAll(){
-  await Promise.all([fetchProfiles(), fetchConnections(), fetchMoments(), fetchStories()]);
+  await Promise.all([fetchProfiles(), fetchConnections(), fetchMoments(), fetchStories(), fetchCommunities()]);
   renderAll();
+  renderInviteNotification();
+}
+
+function renderInviteNotification(){
+  const n = pendingReceived.size;
+  const badge = document.getElementById('invites-nav-badge');
+  const banner = document.getElementById('invites-banner');
+  if (badge) badge.style.display = n ? 'block' : 'none';
+  if (banner) {
+    if (n) {
+      banner.style.display = 'flex';
+      banner.innerHTML = `<span>🔔 Você tem ${n} convite${n > 1 ? 's' : ''} pendente${n > 1 ? 's' : ''}</span><span class="arrow">→</span>`;
+      banner.onclick = () => document.querySelector('.navbtn[data-screen="invites"]').click();
+    } else {
+      banner.style.display = 'none';
+    }
+  }
 }
 
 
@@ -921,6 +1057,7 @@ function avatarHTMLForUser(user, size){
   return avatarHTML(user ? user.nome : '?', size);
 }
 function connKey(a,b){ return [a,b].sort().join('|'); }
+function atName(usuario){ return '@' + (usuario || '').replace(/^@+/, ''); }
 
 /* ================= AUTH: TABS ================= */
 document.querySelectorAll('.auth-tab').forEach(tab=>{
@@ -950,7 +1087,7 @@ document.getElementById('cad-avatar-input').addEventListener('change', (e)=>{
 document.getElementById('form-cadastro').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const nome = document.getElementById('cad-nome').value.trim();
-  const usuario = document.getElementById('cad-usuario').value.trim();
+  const usuario = document.getElementById('cad-usuario').value.trim().replace(/^@+/, '');
   const email = document.getElementById('cad-email').value.trim().toLowerCase();
   const telefone = document.getElementById('cad-telefone').value.trim();
   const nascimento = document.getElementById('cad-nascimento').value || null;
@@ -1072,6 +1209,7 @@ document.querySelectorAll('.navbtn').forEach(btn=>{
     if (btn.dataset.screen === 'search') renderSearch();
     if (btn.dataset.screen === 'invites') renderInvites();
     if (btn.dataset.screen === 'profile') renderProfile();
+    if (btn.dataset.screen === 'comunidades') renderComunidades();
   });
 });
 
@@ -1081,6 +1219,7 @@ function renderAll(){
   renderTimeline();
   renderSearch();
   renderInvites();
+  renderComunidades();
   renderProfile();
 }
 
@@ -1091,7 +1230,7 @@ function visibleMoments(){
       m.taggedIds.includes(currentUser.id) ||
       connections.has(connKey(currentUser.id, m.authorId))
     )
-    .sort((a,b) => b.date.localeCompare(a.date));
+    .sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
 }
 
 // Busca só mostra o que é seu ou o que te marcaram — não os posts de conexões em geral
@@ -1442,9 +1581,12 @@ function renderSearch(){
 function renderInvites(){
   const list = document.getElementById('people-list');
   if (!currentUser) return;
-  const others = users.filter(u => u.id !== currentUser.id);
+  const q = (document.getElementById('invites-search-input').value || '').trim().toLowerCase();
+  const others = users.filter(u => u.id !== currentUser.id && (!q || u.nome.toLowerCase().includes(q) || u.usuario.toLowerCase().includes(q)));
   if (!others.length){
-    list.innerHTML = '<div class="note">Você ainda é a única conta cadastrada. Crie uma segunda conta (saia e cadastre outra) pra poder convidar e marcar nos seus momentos.</div>';
+    list.innerHTML = q
+      ? '<div class="note">Nenhuma conta encontrada pra essa busca.</div>'
+      : '<div class="note">Você ainda é a única conta cadastrada. Crie uma segunda conta (saia e cadastre outra) pra poder convidar e marcar nos seus momentos.</div>';
     return;
   }
 
@@ -1458,7 +1600,7 @@ function renderInvites(){
         ${avatarHTMLForUser(u, 42)}
         <div>
           <div class="person-name" data-open-profile="${u.id}">${u.nome}</div>
-          <div class="person-sub">@${u.usuario} · quer se conectar</div>
+          <div class="person-sub">${atName(u.usuario)} · quer se conectar</div>
         </div>
         <button class="accept-btn" data-accept="${u.id}">Aceitar</button>
         <button class="icon-btn" data-decline="${u.id}" title="Recusar">✕</button>
@@ -1477,7 +1619,7 @@ function renderInvites(){
           ${avatarHTMLForUser(u, 42)}
           <div>
             <div class="person-name" data-open-profile="${u.id}">${u.nome}</div>
-            <div class="person-sub">@${u.usuario}</div>
+            <div class="person-sub">${atName(u.usuario)}</div>
           </div>
           <button class="accept-btn ${(connected||sent) ? 'connected' : ''}" data-toggle="${u.id}" ${sent ? 'disabled' : ''}>${label}</button>
         </div>
@@ -1521,17 +1663,152 @@ function renderInvites(){
     });
   });
 }
+document.getElementById('invites-search-input').addEventListener('input', renderInvites);
+
+/* ================= COMUNIDADES ================= */
+function renderComunidades(){
+  const list = document.getElementById('communities-list');
+  const q = (document.getElementById('communities-search-input').value || '').trim().toLowerCase();
+  const filtered = communities.filter(c => !q || c.name.toLowerCase().includes(q));
+
+  if (!filtered.length){
+    list.innerHTML = `<div class="note">${q ? 'Nenhuma comunidade encontrada.' : 'Nenhuma comunidade criada ainda — que tal criar a primeira?'}</div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(c => {
+    const count = communityMemberCount(c.id);
+    const isOwner = c.ownerId === currentUser.id;
+    const isMember = isCommunityMember(c.id, currentUser.id);
+    const photoHTML = c.photoUrl
+      ? `<img src="${c.photoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+      : avatarHTML(c.name, 42);
+    return `
+      <div class="person-row">
+        <div style="width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;">${photoHTML}</div>
+        <div>
+          <div class="person-name" style="cursor:default;">${c.name}</div>
+          <div class="person-sub">${count} membro${count === 1 ? '' : 's'}${isOwner ? ' · você é dono(a)' : ''}</div>
+        </div>
+        ${isOwner
+          ? ''
+          : `<button class="accept-btn ${isMember ? 'connected' : ''}" data-community-toggle="${c.id}">${isMember ? 'Sair' : 'Participar'}</button>`
+        }
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-community-toggle]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      btn.disabled = true;
+      const communityId = btn.dataset.communityToggle;
+      const isMember = isCommunityMember(communityId, currentUser.id);
+      if (isMember) {
+        await sb.from('community_members').delete().eq('community_id', communityId).eq('user_id', currentUser.id);
+      } else {
+        await sb.from('community_members').insert({ community_id: communityId, user_id: currentUser.id });
+      }
+      await fetchCommunities();
+      renderComunidades();
+      renderProfile();
+    });
+  });
+}
+document.getElementById('communities-search-input').addEventListener('input', renderComunidades);
+
+/* ---- Criar comunidade ---- */
+let communityPhotoFile = null;
+document.getElementById('create-community-btn').addEventListener('click', ()=>{
+  communityPhotoFile = null;
+  document.getElementById('community-name-input').value = '';
+  document.getElementById('community-photo-preview').innerHTML = '';
+  document.getElementById('community-photo-label').textContent = 'Toque para escolher uma foto (opcional)';
+  document.getElementById('create-community-error').textContent = '';
+  document.getElementById('create-community-submit').disabled = true;
+  openModal('modal-create-community');
+});
+document.getElementById('community-photo-input').addEventListener('change', (e)=>{
+  communityPhotoFile = (e.target.files || [])[0] || null;
+  const row = document.getElementById('community-photo-preview');
+  row.innerHTML = '';
+  if (communityPhotoFile){
+    const url = URL.createObjectURL(communityPhotoFile);
+    const thumb = document.createElement('div');
+    thumb.className = 'preview-thumb';
+    thumb.innerHTML = `<img src="${url}">`;
+    row.appendChild(thumb);
+    document.getElementById('community-photo-label').textContent = '1 foto selecionada';
+  }
+});
+document.getElementById('community-name-input').addEventListener('input', (e)=>{
+  document.getElementById('create-community-submit').disabled = !e.target.value.trim();
+});
+document.getElementById('create-community-submit').addEventListener('click', async ()=>{
+  const name = document.getElementById('community-name-input').value.trim();
+  const err = document.getElementById('create-community-error');
+  const btn = document.getElementById('create-community-submit');
+  if (!name) return;
+
+  btn.disabled = true; btn.textContent = 'Criando...';
+  let photoPath = null;
+  if (communityPhotoFile) {
+    const path = `communities/${currentUser.id}-${crypto.randomUUID()}-${communityPhotoFile.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+    const { error: upErr } = await sb.storage.from(BUCKET).upload(path, communityPhotoFile);
+    if (upErr) { err.textContent = 'Falha ao enviar a foto: ' + upErr.message; btn.disabled = false; btn.textContent = 'Criar comunidade'; return; }
+    photoPath = path;
+  }
+
+  const { data, error } = await sb.from('communities').insert({ owner_id: currentUser.id, name, photo_path: photoPath }).select().single();
+  if (error) { err.textContent = 'Falha ao criar: ' + error.message; btn.disabled = false; btn.textContent = 'Criar comunidade'; return; }
+
+  // dono já entra como membro automaticamente
+  await sb.from('community_members').insert({ community_id: data.id, user_id: currentUser.id });
+
+  await fetchCommunities();
+  renderComunidades();
+  renderProfile();
+  btn.disabled = false; btn.textContent = 'Criar comunidade';
+  closeModal('modal-create-community');
+});
+
+/* ---- Modal de lista (dono / membro), aberto a partir do perfil ---- */
+function openCommunitiesListModal(title, list){
+  document.getElementById('communities-list-modal-title').textContent = title;
+  const body = document.getElementById('communities-list-modal-body');
+  body.innerHTML = list.length
+    ? list.map(c => {
+        const photoHTML = c.photoUrl
+          ? `<img src="${c.photoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+          : avatarHTML(c.name, 42);
+        return `
+          <div class="person-row">
+            <div style="width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;">${photoHTML}</div>
+            <div><div class="person-name" style="cursor:default;">${c.name}</div>
+            <div class="person-sub">${communityMemberCount(c.id)} membro${communityMemberCount(c.id) === 1 ? '' : 's'}</div></div>
+          </div>
+        `;
+      }).join('')
+    : '<div class="plan-note">Nenhuma comunidade por aqui ainda.</div>';
+  openModal('modal-communities-list');
+}
 
 /* ================= PERFIL ================= */
 async function renderProfile(){
   if (!currentUser) return;
   document.getElementById('profile-avatar').outerHTML = avatarHTMLForUser(currentUser, 82).replace('avatar-circle', 'avatar-circle profile-avatar').replace('<div', '<div id="profile-avatar"');
   document.getElementById('profile-name').textContent = currentUser.nome;
-  document.getElementById('profile-bio').textContent = `@${currentUser.usuario} · ${currentUser.email}`;
-  const own = moments.filter(m=>m.authorId===currentUser.id).sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('profile-bio').textContent = `${atName(currentUser.usuario)} · ${currentUser.email}`;
+  const own = moments.filter(m=>m.authorId===currentUser.id).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   document.getElementById('stat-moments').textContent = own.length;
   document.getElementById('stat-connections').textContent = users.filter(u=>u.id!==currentUser.id && connections.has(connKey(currentUser.id,u.id))).length;
   document.getElementById('stat-since').textContent = currentUser.criadoEm.getFullYear();
+
+  const ownedCommunities = communities.filter(c => c.ownerId === currentUser.id);
+  const memberCommunities = communities.filter(c => c.ownerId !== currentUser.id && isCommunityMember(c.id, currentUser.id));
+  document.getElementById('stat-communities-owner').textContent = ownedCommunities.length;
+  document.getElementById('stat-communities-member').textContent = memberCommunities.length;
+  document.getElementById('own-communities-owner-btn').onclick = () => openCommunitiesListModal('Comunidades que você criou', ownedCommunities);
+  document.getElementById('own-communities-member-btn').onclick = () => openCommunitiesListModal('Comunidades que você participa', memberCommunities);
 
   const grid = document.getElementById('profile-grid');
   document.getElementById('profile-empty').style.display = own.length ? 'none' : 'block';
@@ -1585,6 +1862,31 @@ document.getElementById('own-testimonials-btn').addEventListener('click', ()=>{
   openTestimonialsModal(currentUser.id, currentUser.nome);
 });
 
+document.getElementById('change-password-btn').addEventListener('click', ()=>{
+  document.getElementById('new-password-input').value = '';
+  document.getElementById('new-password-confirm').value = '';
+  document.getElementById('change-password-error').textContent = '';
+  openModal('modal-change-password');
+});
+
+document.getElementById('change-password-submit').addEventListener('click', async ()=>{
+  const senha = document.getElementById('new-password-input').value;
+  const senha2 = document.getElementById('new-password-confirm').value;
+  const err = document.getElementById('change-password-error');
+  const btn = document.getElementById('change-password-submit');
+
+  if (senha.length < 6) { err.textContent = 'A senha precisa ter pelo menos 6 caracteres.'; return; }
+  if (senha !== senha2) { err.textContent = 'As senhas não conferem.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  const { error } = await sb.auth.updateUser({ password: senha });
+  btn.disabled = false; btn.textContent = 'Salvar nova senha';
+  if (error) { err.textContent = 'Falha ao trocar a senha: ' + error.message; return; }
+
+  closeModal('modal-change-password');
+  alert('Senha alterada com sucesso!');
+});
+
 document.getElementById('edit-profile-btn').addEventListener('click', ()=>{
   document.getElementById('edit-nome').value = currentUser.nome || '';
   document.getElementById('edit-usuario').value = currentUser.usuario || '';
@@ -1596,7 +1898,7 @@ document.getElementById('edit-profile-btn').addEventListener('click', ()=>{
 
 document.getElementById('edit-profile-submit').addEventListener('click', async ()=>{
   const nome = document.getElementById('edit-nome').value.trim();
-  const usuario = document.getElementById('edit-usuario').value.trim();
+  const usuario = document.getElementById('edit-usuario').value.trim().replace(/^@+/, '');
   const telefone = document.getElementById('edit-telefone').value.trim();
   const nascimento = document.getElementById('edit-nascimento').value || null;
   const err = document.getElementById('edit-profile-error');
@@ -1619,11 +1921,18 @@ async function openUserProfile(userId){
   if (!u) return;
   document.getElementById('upv-avatar').outerHTML = avatarHTMLForUser(u, 82).replace('avatar-circle', 'avatar-circle profile-avatar').replace('<div', '<div id="upv-avatar"');
   document.getElementById('upv-name').textContent = u.nome;
-  document.getElementById('upv-bio').textContent = `@${u.usuario}`;
+  document.getElementById('upv-bio').textContent = `${atName(u.usuario)}`;
   document.getElementById('upv-since').textContent = u.criadoEm.getFullYear();
+
+  const uOwnedCommunities = communities.filter(c => c.ownerId === u.id);
+  const uMemberCommunities = communities.filter(c => c.ownerId !== u.id && isCommunityMember(c.id, u.id));
+  document.getElementById('upv-communities-owner-count').textContent = uOwnedCommunities.length;
+  document.getElementById('upv-communities-member-count').textContent = uMemberCommunities.length;
+  document.getElementById('upv-communities-owner-btn').onclick = () => openCommunitiesListModal(`Comunidades de ${u.nome} (dono)`, uOwnedCommunities);
+  document.getElementById('upv-communities-member-btn').onclick = () => openCommunitiesListModal(`Comunidades de ${u.nome} (membro)`, uMemberCommunities);
   document.getElementById('upv-testimonials-btn').onclick = () => openTestimonialsModal(u.id, u.nome);
 
-  const theirMoments = moments.filter(m => m.authorId === u.id).sort((a,b)=>b.date.localeCompare(a.date));
+  const theirMoments = moments.filter(m => m.authorId === u.id).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
   const upvGrid = document.getElementById('upv-grid');
   document.getElementById('upv-empty').style.display = theirMoments.length ? 'none' : 'block';
   upvGrid.innerHTML = theirMoments.map(m => `
