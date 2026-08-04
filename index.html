@@ -807,6 +807,17 @@
     </div>
   </div>
 
+  <!-- MODAL: MEMBROS DE UMA COMUNIDADE -->
+  <div class="modal-overlay" id="modal-community-members">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title" id="community-members-modal-title">Membros</div>
+        <button class="modal-close" data-close="modal-community-members">✕</button>
+      </div>
+      <div id="community-members-modal-body"></div>
+    </div>
+  </div>
+
   <!-- MODAL: TROCAR SENHA -->
   <div class="modal-overlay" id="modal-change-password">
     <div class="modal-sheet">
@@ -1722,10 +1733,12 @@ function renderComunidades(){
       : avatarHTML(c.name, 42);
     return `
       <div class="person-row">
-        <div style="width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;">${photoHTML}</div>
-        <div>
-          <div class="person-name" style="cursor:default;">${c.name}</div>
-          <div class="person-sub">${count} membro${count === 1 ? '' : 's'}${isOwner ? ' · você é dono(a)' : ''}</div>
+        <div data-open-members="${c.id}" style="display:flex; align-items:center; gap:12px; cursor:pointer; flex:1; min-width:0;">
+          <div style="width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;">${photoHTML}</div>
+          <div style="min-width:0;">
+            <div class="person-name" style="cursor:pointer;">${c.name}</div>
+            <div class="person-sub">${count} membro${count === 1 ? '' : 's'}${isOwner ? ' · você é dono(a)' : ''}</div>
+          </div>
         </div>
         ${isOwner
           ? ''
@@ -1735,8 +1748,13 @@ function renderComunidades(){
     `;
   }).join('');
 
+  list.querySelectorAll('[data-open-members]').forEach(el=>{
+    el.addEventListener('click', ()=> openCommunityMembersModal(el.dataset.openMembers));
+  });
+
   list.querySelectorAll('[data-community-toggle]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
+    btn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
       btn.disabled = true;
       const communityId = btn.dataset.communityToggle;
       const isMember = isCommunityMember(communityId, currentUser.id);
@@ -1827,6 +1845,43 @@ function openCommunitiesListModal(title, list){
       }).join('')
     : '<div class="plan-note">Nenhuma comunidade por aqui ainda.</div>';
   openModal('modal-communities-list');
+}
+
+function openCommunityMembersModal(communityId){
+  const community = communities.find(c => c.id === communityId);
+  if (!community) return;
+  document.getElementById('community-members-modal-title').textContent = `Membros de ${community.name}`;
+
+  const memberIds = communityMembers.filter(m => m.communityId === communityId).map(m => m.userId);
+  const memberUsers = memberIds.map(id => users.find(u => u.id === id)).filter(Boolean);
+  // dono sempre primeiro, o resto ordenado por nome
+  memberUsers.sort((a, b) => {
+    if (a.id === community.ownerId) return -1;
+    if (b.id === community.ownerId) return 1;
+    return a.nome.localeCompare(b.nome);
+  });
+
+  const body = document.getElementById('community-members-modal-body');
+  body.innerHTML = memberUsers.length
+    ? memberUsers.map(u => `
+        <div class="person-row">
+          ${avatarHTMLForUser(u, 42)}
+          <div>
+            <div class="person-name" data-open-profile="${u.id}">${u.nome}${u.id === community.ownerId ? ' 👑' : ''}</div>
+            <div class="person-sub">${atName(u.usuario)}${u.id === community.ownerId ? ' · dono(a) da comunidade' : ''}</div>
+          </div>
+        </div>
+      `).join('')
+    : '<div class="plan-note">Nenhum membro por aqui ainda.</div>';
+
+  body.querySelectorAll('[data-open-profile]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      closeModal('modal-community-members');
+      openUserProfile(el.dataset.openProfile);
+    });
+  });
+
+  openModal('modal-community-members');
 }
 
 /* ================= PERFIL ================= */
