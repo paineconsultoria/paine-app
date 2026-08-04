@@ -87,7 +87,6 @@
       box-shadow:none;
     }
     .status{ display:none; }
-    .upload-fab{ position:fixed; }
   }
 
   .screens{
@@ -293,9 +292,12 @@
     position:absolute; right:22px; bottom:24px;
     width:52px; height:52px; border-radius:50%;
     background:linear-gradient(160deg, var(--lime-soft), var(--lime));
-    display:flex; align-items:center; justify-content:center;
+    display:none; align-items:center; justify-content:center;
     box-shadow:0 12px 24px -8px rgba(159,201,58,0.5);
     border:none; cursor:pointer; z-index:5;
+  }
+  @media (max-width: 520px), (display-mode: standalone) {
+    .upload-fab{ position:fixed; }
   }
 
   /* ---- SEARCH ---- */
@@ -611,10 +613,6 @@
         <div class="sprocket-rail" id="sprocket-rail"></div>
       </div>
       <div id="timeline-empty" class="empty-state" style="display:none;">Nenhum momento ainda. Toque no botão "+" pra guardar o primeiro.</div>
-
-      <button class="upload-fab" id="post-fab-btn" title="Adicionar momento">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1c2a3a" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      </button>
     </div>
 
     <!-- BUSCAR -->
@@ -720,6 +718,10 @@
     </div>
 
   </div>
+
+  <button class="upload-fab" id="post-fab-btn" title="Adicionar momento">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1c2a3a" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
 
 
   <!-- VISUALIZADOR DE MOMENTOS (tela cheia) -->
@@ -972,6 +974,7 @@ async function fetchMoments(){
       dateLabel: `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`,
       place: m.place, subject: m.subject, caption: m.caption,
       mediaUrl: first.path ? publicUrl(first.path) : '',
+      posterUrl: first.posterPath ? publicUrl(first.posterPath) : '',
       isVideo: !!first.isVideo,
       extraCount: media.length > 1 ? media.length - 1 : 0
     };
@@ -985,6 +988,7 @@ async function fetchStories(){
   if (error) { console.error(error); return; }
   stories = (data || []).map(s => ({
     id: s.id, authorId: s.author_id, url: publicUrl(s.media_path),
+    posterUrl: s.poster_path ? publicUrl(s.poster_path) : '',
     isVideo: s.is_video, caption: s.caption, createdAt: new Date(s.created_at)
   }));
 }
@@ -1057,6 +1061,36 @@ function avatarHTMLForUser(user, size){
   return avatarHTML(user ? user.nome : '?', size);
 }
 function connKey(a,b){ return [a,b].sort().join('|'); }
+
+/* Gera uma imagem de capa (poster) a partir de um vídeo, pra nunca aparecer em branco no feed */
+function generateVideoPoster(file){
+  return new Promise((resolve) => {
+    try {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+      const url = URL.createObjectURL(file);
+      video.src = url;
+      const cleanup = () => URL.revokeObjectURL(url);
+      video.addEventListener('loadeddata', () => {
+        video.currentTime = Math.min(0.15, (video.duration || 1) / 2);
+      });
+      video.addEventListener('seeked', () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 400;
+          canvas.height = video.videoHeight || 400;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => { cleanup(); resolve(blob); }, 'image/jpeg', 0.82);
+        } catch (e) { cleanup(); resolve(null); }
+      });
+      video.addEventListener('error', () => { cleanup(); resolve(null); });
+      setTimeout(() => resolve(null), 6000); // não trava o envio se algo travar
+    } catch (e) { resolve(null); }
+  });
+}
 function atName(usuario){ return '@' + (usuario || '').replace(/^@+/, ''); }
 
 /* ================= AUTH: TABS ================= */
@@ -1159,6 +1193,7 @@ async function enterAppAfterAuth(){
   document.getElementById('app-screens').style.display = '';
   document.getElementById('bottomnav').style.display = '';
   moveNavToScreen('timeline');
+  document.getElementById('post-fab-btn').style.display = 'flex';
   document.getElementById('login-email').value = '';
   document.getElementById('login-password').value = '';
   await syncAll();
@@ -1170,6 +1205,7 @@ document.getElementById('logout-btn').addEventListener('click', async ()=>{
   currentUser = null;
   document.getElementById('app-screens').style.display = 'none';
   document.getElementById('bottomnav').style.display = 'none';
+  document.getElementById('post-fab-btn').style.display = 'none';
   document.getElementById('auth-view').style.display = 'flex';
 });
 
@@ -1206,6 +1242,7 @@ document.querySelectorAll('.navbtn').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById('screen-' + btn.dataset.screen).classList.add('active');
     moveNavToScreen(btn.dataset.screen);
+    document.getElementById('post-fab-btn').style.display = (btn.dataset.screen === 'timeline') ? 'flex' : 'none';
     if (btn.dataset.screen === 'search') renderSearch();
     if (btn.dataset.screen === 'invites') renderInvites();
     if (btn.dataset.screen === 'profile') renderProfile();
@@ -1284,7 +1321,7 @@ function renderStories(){
         <div class="${itemClasses}" data-author="${g.authorId}">
           <div class="story-triangle">
             <div class="tri-inner">
-              ${cover.isVideo ? `<video src="${cover.url}" muted></video>` : `<img src="${cover.url}">`}
+              ${cover.isVideo ? `<video src="${cover.url}" poster="${cover.posterUrl || ''}" muted playsinline preload="metadata"></video>` : `<img src="${cover.url}">`}
             </div>
           </div>
           <div class="story-lbl">${g.name}</div>
@@ -1329,7 +1366,7 @@ function showStoryItem(idx){
   if (oldMedia) oldMedia.remove();
   const el = document.createElement(item.isVideo ? 'video' : 'img');
   el.src = item.url;
-  if (item.isVideo) { el.muted = true; el.autoplay = true; el.playsInline = true; }
+  if (item.isVideo) { el.muted = true; el.autoplay = true; el.playsInline = true; if (item.posterUrl) el.poster = item.posterUrl; }
   media.insertBefore(el, media.firstChild);
 
   const cap = document.getElementById('story-viewer-caption');
@@ -1460,7 +1497,7 @@ function renderTimeline(){
       <div class="date-tag">${m.dateLabel}${m.place ? ' · ' + m.place.toUpperCase() : ''}</div>
       <div class="card">
         <div class="card-media" data-open-photo="${m.id}">
-          ${m.isVideo ? `<video src="${m.mediaUrl}" muted></video>` : `<img src="${m.mediaUrl}" alt="momento">`}
+          ${m.isVideo ? `<video src="${m.mediaUrl}" poster="${m.posterUrl || ''}" muted playsinline preload="metadata"></video>` : `<img src="${m.mediaUrl}" alt="momento">`}
         </div>
         <div class="body">
           <div class="tags">
@@ -1568,7 +1605,7 @@ function renderSearch(){
 
   resultsGrid.innerHTML = filtered.map(m => `
     <div class="grid-item" data-open-photo="${m.id}">
-      ${m.isVideo ? `<video src="${m.mediaUrl}" muted></video>` : `<img src="${m.mediaUrl}">`}
+      ${m.isVideo ? `<video src="${m.mediaUrl}" poster="${m.posterUrl || ''}" muted playsinline preload="metadata"></video>` : `<img src="${m.mediaUrl}">`}
       <div class="lbl">${m.place || m.subject} · ${m.dateLabel.split(' ').pop()}</div>
     </div>
   `).join('') || '<div style="color:var(--cream-dim); font-size:13px; padding:20px 0;">Nenhum momento encontrado ainda. Publique ou marque alguém pra testar a busca.</div>';
@@ -1814,7 +1851,7 @@ async function renderProfile(){
   document.getElementById('profile-empty').style.display = own.length ? 'none' : 'block';
   grid.innerHTML = own.map(m => `
     <div class="grid-item">
-      ${m.isVideo ? `<video src="${m.mediaUrl}" muted></video>` : `<img src="${m.mediaUrl}">`}
+      ${m.isVideo ? `<video src="${m.mediaUrl}" poster="${m.posterUrl || ''}" muted playsinline preload="metadata"></video>` : `<img src="${m.mediaUrl}">`}
     </div>
   `).join('');
 
@@ -1937,7 +1974,7 @@ async function openUserProfile(userId){
   document.getElementById('upv-empty').style.display = theirMoments.length ? 'none' : 'block';
   upvGrid.innerHTML = theirMoments.map(m => `
     <div class="grid-item" data-open-photo="${m.id}">
-      ${m.isVideo ? `<video src="${m.mediaUrl}" muted></video>` : `<img src="${m.mediaUrl}">`}
+      ${m.isVideo ? `<video src="${m.mediaUrl}" poster="${m.posterUrl || ''}" muted playsinline preload="metadata"></video>` : `<img src="${m.mediaUrl}">`}
     </div>
   `).join('');
   upvGrid.querySelectorAll('[data-open-photo]').forEach(el=>{
@@ -2089,7 +2126,17 @@ document.getElementById('post-submit').addEventListener('click', async ()=>{
     const path = `${currentUser.id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
     const { error: upErr } = await sb.storage.from(BUCKET).upload(path, file);
     if (upErr) { alert('Falha ao enviar arquivo: ' + upErr.message + (upErr.statusCode ? ' (código ' + upErr.statusCode + ')' : '')); btn.disabled = false; btn.textContent = 'Publicar'; return; }
-    media.push({ path, isVideo: file.type.startsWith('video') });
+    const isVideo = file.type.startsWith('video');
+    let posterPath = null;
+    if (isVideo) {
+      const posterBlob = await generateVideoPoster(file);
+      if (posterBlob) {
+        const pPath = `${currentUser.id}/${crypto.randomUUID()}-poster.jpg`;
+        const { error: pErr } = await sb.storage.from(BUCKET).upload(pPath, posterBlob);
+        if (!pErr) posterPath = pPath;
+      }
+    }
+    media.push({ path, isVideo, posterPath });
   }
 
   const { error } = await sb.from('moments').insert({
@@ -2137,9 +2184,20 @@ document.getElementById('story-submit').addEventListener('click', async ()=>{
   const { error: upErr } = await sb.storage.from(BUCKET).upload(path, storyFile);
   if (upErr) { alert('Falha ao enviar arquivo: ' + upErr.message); btn.disabled = false; btn.textContent = 'Publicar momento'; return; }
 
+  const isVideo = storyFile.type.startsWith('video');
+  let posterPath = null;
+  if (isVideo) {
+    const posterBlob = await generateVideoPoster(storyFile);
+    if (posterBlob) {
+      const pPath = `${currentUser.id}/${crypto.randomUUID()}-poster.jpg`;
+      const { error: pErr } = await sb.storage.from(BUCKET).upload(pPath, posterBlob);
+      if (!pErr) posterPath = pPath;
+    }
+  }
+
   const { error } = await sb.from('stories').insert({
-    author_id: currentUser.id, media_path: path,
-    is_video: storyFile.type.startsWith('video'),
+    author_id: currentUser.id, media_path: path, poster_path: posterPath,
+    is_video: isVideo,
     caption: document.getElementById('story-caption').value.trim()
   });
   if (error) { alert('Falha ao publicar: ' + error.message); btn.disabled = false; btn.textContent = 'Publicar momento'; return; }
