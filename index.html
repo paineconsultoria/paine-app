@@ -672,12 +672,27 @@
       </div>
     </div>
 
-    <!-- SERVIÇOS (em construção) -->
+    <!-- SERVIÇOS -->
     <div class="screen" id="screen-servicos">
       <div class="screen-sticky-top">
         <div class="app-header"><div class="wordmark" style="font-size:20px;">Serviços</div></div>
       </div>
-      <div class="empty-state" style="margin:30px 22px;">Em breve. Aqui vão ficar serviços de bem-estar e saúde — psicólogos, nutricionistas, educadores físicos e outros profissionais.</div>
+      <div class="invites-wrap">
+        <div class="note">Profissionais autônomos de saúde e bem-estar — encontre por especialidade, cidade ou valor.</div>
+        <div class="search-bar" style="margin-top:14px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c7d6e6" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input type="text" id="services-search-input" placeholder="Buscar profissional, cidade ou serviço...">
+        </div>
+        <div class="filters" id="services-category-filters" style="margin-top:12px;"></div>
+        <button class="accept-btn" id="become-professional-btn" style="margin-top:14px; width:100%; padding:12px;">Oferecer meus serviços</button>
+        <div id="my-services-wrap" style="display:none;">
+          <div class="profile-section-label" style="padding:0;">Meus serviços</div>
+          <div id="my-services-list"></div>
+          <button class="accept-btn" id="add-service-btn" style="margin-top:10px; width:100%; padding:10px;">+ Novo serviço</button>
+        </div>
+        <div class="results-label" style="margin-top:18px;">Profissionais disponíveis</div>
+        <div id="services-list"></div>
+      </div>
     </div>
 
     <!-- PERFIL -->
@@ -804,6 +819,68 @@
         <button class="modal-close" data-close="modal-communities-list">✕</button>
       </div>
       <div id="communities-list-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: TORNAR-SE PROFISSIONAL -->
+  <div class="modal-overlay" id="modal-become-professional">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Oferecer meus serviços</div>
+        <button class="modal-close" data-close="modal-become-professional">✕</button>
+      </div>
+      <div class="plan-note" style="margin-bottom:6px;">Esses dados aparecem pra quem buscar você na aba Serviços.</div>
+      <div class="field-label">Registro no conselho (ex: CRP 06/12345)</div>
+      <input class="field-input" type="text" id="prof-registro" placeholder="Opcional por enquanto">
+      <div class="field-label">Cidade</div>
+      <input class="field-input" type="text" id="prof-cidade" placeholder="Ex: Curitiba">
+      <div class="field-label">Bio</div>
+      <textarea class="field-input" id="prof-bio" placeholder="Conte um pouco sobre sua atuação..."></textarea>
+      <div class="auth-error" id="become-professional-error"></div>
+      <button class="submit-btn" id="become-professional-submit">Salvar e continuar</button>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVO / EDITAR SERVIÇO -->
+  <div class="modal-overlay" id="modal-service">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title" id="service-modal-title">Novo serviço</div>
+        <button class="modal-close" data-close="modal-service">✕</button>
+      </div>
+      <div class="field-label">Categoria</div>
+      <select class="field-input date-select" id="service-category" style="width:100%;">
+        <option>Psicologia</option>
+        <option>Psiquiatria</option>
+        <option>Nutrição</option>
+        <option>Personal Trainer / Educação Física</option>
+        <option>Fisioterapia</option>
+        <option>Terapia Ocupacional</option>
+        <option>Fonoaudiologia</option>
+        <option>Terapia de Casal / Família</option>
+        <option>Yoga / Pilates / Meditação</option>
+        <option>Coach de Sono</option>
+        <option>Acupuntura</option>
+        <option>Massoterapia</option>
+        <option>Cuidador(a) de Idosos</option>
+        <option>Outro</option>
+      </select>
+      <div class="field-label">Nome do serviço</div>
+      <input class="field-input" type="text" id="service-name" placeholder="Ex: Sessão de terapia">
+      <div class="field-label">Descrição</div>
+      <textarea class="field-input" id="service-description" placeholder="O que está incluso, como funciona..."></textarea>
+      <div class="field-row">
+        <div>
+          <div class="field-label">Duração (min)</div>
+          <input class="field-input" type="number" id="service-duration" placeholder="50">
+        </div>
+        <div>
+          <div class="field-label">Valor (R$)</div>
+          <input class="field-input" type="number" step="0.01" id="service-price" placeholder="150.00">
+        </div>
+      </div>
+      <div class="auth-error" id="service-error"></div>
+      <button class="submit-btn" id="service-submit">Salvar serviço</button>
     </div>
   </div>
 
@@ -1029,8 +1106,30 @@ function isCommunityMember(communityId, userId){
   return communityMembers.some(m => m.communityId === communityId && m.userId === userId);
 }
 
+let professionalProfiles = []; // {id, registro, cidade, bio}
+let services = [];             // {id, professionalId, category, name, description, durationMinutes, price}
+
+async function fetchServices(){
+  const [{ data: profs, error: e1 }, { data: svcs, error: e2 }] = await Promise.all([
+    sb.from('professional_profiles').select('*'),
+    sb.from('services').select('*').eq('active', true).order('created_at', { ascending: false })
+  ]);
+  if (e1) { console.error(e1); return; }
+  if (e2) { console.error(e2); return; }
+  professionalProfiles = (profs || []).map(p => ({
+    id: p.id, registro: p.registro_conselho, cidade: p.cidade, bio: p.bio
+  }));
+  services = (svcs || []).map(s => ({
+    id: s.id, professionalId: s.professional_id, category: s.category, name: s.name,
+    description: s.description, durationMinutes: s.duration_minutes, price: Number(s.price)
+  }));
+}
+function myProfessionalProfile(){
+  return professionalProfiles.find(p => p.id === currentUser.id);
+}
+
 async function syncAll(){
-  await Promise.all([fetchProfiles(), fetchConnections(), fetchMoments(), fetchStories(), fetchCommunities()]);
+  await Promise.all([fetchProfiles(), fetchConnections(), fetchMoments(), fetchStories(), fetchCommunities(), fetchServices()]);
   renderAll();
   renderInviteNotification();
 }
@@ -1258,6 +1357,7 @@ document.querySelectorAll('.navbtn').forEach(btn=>{
     if (btn.dataset.screen === 'invites') renderInvites();
     if (btn.dataset.screen === 'profile') renderProfile();
     if (btn.dataset.screen === 'comunidades') renderComunidades();
+    if (btn.dataset.screen === 'servicos') renderServicos();
   });
 });
 
@@ -1268,6 +1368,7 @@ function renderAll(){
   renderSearch();
   renderInvites();
   renderComunidades();
+  renderServicos();
   renderProfile();
 }
 
@@ -1883,6 +1984,177 @@ function openCommunityMembersModal(communityId){
 
   openModal('modal-community-members');
 }
+
+/* ================= SERVIÇOS ================= */
+const SERVICE_CATEGORIES = ['Psicologia','Psiquiatria','Nutrição','Personal Trainer / Educação Física','Fisioterapia','Terapia Ocupacional','Fonoaudiologia','Terapia de Casal / Família','Yoga / Pilates / Meditação','Coach de Sono','Acupuntura','Massoterapia','Cuidador(a) de Idosos','Outro'];
+let activeServiceCategory = 'Tudo';
+
+function renderServicos(){
+  if (!currentUser) return;
+  renderServiceCategoryFilters();
+  renderMyServices();
+  renderServicesSearch();
+}
+
+function renderServiceCategoryFilters(){
+  const wrap = document.getElementById('services-category-filters');
+  const cats = ['Tudo', ...SERVICE_CATEGORIES];
+  wrap.innerHTML = cats.map(c => `<button type="button" class="filter-chip ${c === activeServiceCategory ? 'on' : ''}" data-cat="${c}">${c}</button>`).join('');
+  wrap.querySelectorAll('[data-cat]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      activeServiceCategory = btn.dataset.cat;
+      renderServiceCategoryFilters();
+      renderServicesSearch();
+    });
+  });
+}
+
+function renderServicesSearch(){
+  const list = document.getElementById('services-list');
+  const q = (document.getElementById('services-search-input').value || '').trim().toLowerCase();
+  const filtered = services.filter(s => {
+    if (s.professionalId === currentUser.id) return false; // não mostra os próprios aqui, ficam em "Meus serviços"
+    if (activeServiceCategory !== 'Tudo' && s.category !== activeServiceCategory) return false;
+    if (!q) return true;
+    const prof = users.find(u => u.id === s.professionalId);
+    const profData = professionalProfiles.find(p => p.id === s.professionalId);
+    return s.name.toLowerCase().includes(q) ||
+           s.category.toLowerCase().includes(q) ||
+           (prof && prof.nome.toLowerCase().includes(q)) ||
+           (profData && profData.cidade && profData.cidade.toLowerCase().includes(q));
+  }).sort((a,b) => a.price - b.price);
+
+  if (!filtered.length){
+    list.innerHTML = '<div class="note">Nenhum serviço encontrado ainda.</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(s => {
+    const prof = users.find(u => u.id === s.professionalId);
+    const profData = professionalProfiles.find(p => p.id === s.professionalId);
+    if (!prof) return '';
+    return `
+      <div class="person-row" style="align-items:flex-start;">
+        <div data-open-profile="${prof.id}" style="cursor:pointer; flex-shrink:0;">${avatarHTMLForUser(prof, 42)}</div>
+        <div style="flex:1; min-width:0;">
+          <div class="person-name" data-open-profile="${prof.id}">${prof.nome}</div>
+          <div class="person-sub">${s.category}${profData && profData.cidade ? ' · ' + profData.cidade : ''}</div>
+          <div style="font-family:'Fraunces',serif; font-size:13px; color:var(--cream); margin-top:4px;">${s.name}</div>
+          ${s.description ? `<div style="font-size:11.5px; color:var(--cream-dim); margin-top:2px;">${s.description}</div>` : ''}
+        </div>
+        <div style="text-align:right; flex-shrink:0;">
+          <div style="font-family:'Fraunces',serif; font-weight:600; color:var(--lime-soft); font-size:14px;">R$ ${s.price.toFixed(2)}</div>
+          ${s.durationMinutes ? `<div style="font-size:10.5px; color:var(--cream-dim);">${s.durationMinutes} min</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-open-profile]').forEach(el=>{
+    el.addEventListener('click', ()=> openUserProfile(el.dataset.openProfile));
+  });
+}
+document.getElementById('services-search-input').addEventListener('input', renderServicesSearch);
+
+function renderMyServices(){
+  const wrap = document.getElementById('my-services-wrap');
+  const becomeBtn = document.getElementById('become-professional-btn');
+  const profile = myProfessionalProfile();
+  if (!profile) { wrap.style.display = 'none'; becomeBtn.style.display = 'block'; return; }
+  becomeBtn.style.display = 'none';
+  wrap.style.display = 'block';
+
+  const mine = services.filter(s => s.professionalId === currentUser.id);
+  const list = document.getElementById('my-services-list');
+  list.innerHTML = mine.length ? mine.map(s => `
+    <div class="person-row">
+      <div style="flex:1; min-width:0;">
+        <div class="person-name" style="cursor:default;">${s.name}</div>
+        <div class="person-sub">${s.category} · R$ ${s.price.toFixed(2)}${s.durationMinutes ? ' · ' + s.durationMinutes + ' min' : ''}</div>
+      </div>
+      <button class="icon-btn" data-edit-service="${s.id}" title="Editar">✎</button>
+      <button class="icon-btn" data-delete-service="${s.id}" title="Apagar">🗑</button>
+    </div>
+  `).join('') : '<div class="plan-note">Nenhum serviço cadastrado ainda.</div>';
+
+  list.querySelectorAll('[data-edit-service]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openServiceModal(btn.dataset.editService));
+  });
+  list.querySelectorAll('[data-delete-service]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if (!confirm('Apagar esse serviço?')) return;
+      btn.disabled = true;
+      await sb.from('services').delete().eq('id', btn.dataset.deleteService);
+      await fetchServices();
+      renderServicos();
+    });
+  });
+}
+
+/* ---- Virar profissional ---- */
+document.getElementById('become-professional-btn').addEventListener('click', ()=>{
+  document.getElementById('prof-registro').value = '';
+  document.getElementById('prof-cidade').value = '';
+  document.getElementById('prof-bio').value = '';
+  document.getElementById('become-professional-error').textContent = '';
+  openModal('modal-become-professional');
+});
+document.getElementById('become-professional-submit').addEventListener('click', async ()=>{
+  const registro = document.getElementById('prof-registro').value.trim();
+  const cidade = document.getElementById('prof-cidade').value.trim();
+  const bio = document.getElementById('prof-bio').value.trim();
+  const err = document.getElementById('become-professional-error');
+  const btn = document.getElementById('become-professional-submit');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  const { error } = await sb.from('professional_profiles').insert({ id: currentUser.id, registro_conselho: registro, cidade, bio });
+  btn.disabled = false; btn.textContent = 'Salvar e continuar';
+  if (error) { err.textContent = 'Falha ao salvar: ' + error.message; return; }
+  await fetchServices();
+  renderServicos();
+  closeModal('modal-become-professional');
+  openServiceModal();
+});
+
+/* ---- Criar / editar serviço ---- */
+let editingServiceId = null;
+function openServiceModal(serviceId){
+  editingServiceId = serviceId || null;
+  const s = serviceId ? services.find(x => x.id === serviceId) : null;
+  document.getElementById('service-modal-title').textContent = s ? 'Editar serviço' : 'Novo serviço';
+  document.getElementById('service-category').value = s ? s.category : SERVICE_CATEGORIES[0];
+  document.getElementById('service-name').value = s ? s.name : '';
+  document.getElementById('service-description').value = s ? (s.description || '') : '';
+  document.getElementById('service-duration').value = s ? (s.durationMinutes || '') : '';
+  document.getElementById('service-price').value = s ? s.price : '';
+  document.getElementById('service-error').textContent = '';
+  openModal('modal-service');
+}
+document.getElementById('add-service-btn').addEventListener('click', () => openServiceModal());
+document.getElementById('service-submit').addEventListener('click', async ()=>{
+  const category = document.getElementById('service-category').value;
+  const name = document.getElementById('service-name').value.trim();
+  const description = document.getElementById('service-description').value.trim();
+  const duration = parseInt(document.getElementById('service-duration').value, 10) || null;
+  const price = parseFloat(document.getElementById('service-price').value);
+  const err = document.getElementById('service-error');
+  const btn = document.getElementById('service-submit');
+
+  if (!name || !price || price <= 0) { err.textContent = 'Preencha o nome e um valor válido.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  let error;
+  if (editingServiceId) {
+    ({ error } = await sb.from('services').update({ category, name, description, duration_minutes: duration, price }).eq('id', editingServiceId));
+  } else {
+    ({ error } = await sb.from('services').insert({ professional_id: currentUser.id, category, name, description, duration_minutes: duration, price }));
+  }
+  btn.disabled = false; btn.textContent = 'Salvar serviço';
+  if (error) { err.textContent = 'Falha ao salvar: ' + error.message; return; }
+
+  await fetchServices();
+  renderServicos();
+  closeModal('modal-service');
+});
 
 /* ================= PERFIL ================= */
 async function renderProfile(){
