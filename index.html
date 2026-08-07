@@ -2340,15 +2340,28 @@ async function openTestimonialsModal(userId, nome){
   const list = document.getElementById('testimonials-list');
   list.innerHTML = '<div class="plan-note">Carregando...</div>';
   const { data } = await sb.from('testimonials').select('*').eq('target_id', userId).eq('status','accepted').order('created_at',{ascending:false});
+  const isOwn = userId === currentUser.id;
   list.innerHTML = (data && data.length) ? data.map(t => {
     const author = users.find(u=>u.id===t.author_id);
     return `
       <div class="testimonial-item">
         <div class="t-author">${author ? author.nome : 'alguém'}</div>
         <div class="t-content">"${t.content}"</div>
+        ${isOwn ? `<button class="icon-btn" data-remove-testimonial="${t.id}" title="Remover" style="margin-top:4px;">🗑 Remover</button>` : ''}
       </div>
     `;
   }).join('') : '<div class="plan-note">Nenhum depoimento por aqui ainda.</div>';
+
+  list.querySelectorAll('[data-remove-testimonial]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if (!confirm('Remover esse depoimento do seu perfil?')) return;
+      btn.disabled = true;
+      await sb.from('testimonials').delete().eq('id', btn.dataset.removeTestimonial);
+      await openTestimonialsModal(userId, nome);
+      renderProfile();
+    });
+  });
+
   openModal('modal-testimonials');
 }
 
