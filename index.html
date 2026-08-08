@@ -898,6 +898,21 @@
     </div>
   </div>
 
+  <!-- MODAL: AJUSTAR CAPA -->
+  <div class="modal-overlay" id="modal-cover-crop">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Ajustar capa</div>
+        <button class="modal-close" data-close="modal-cover-crop">✕</button>
+      </div>
+      <div class="plan-note" style="margin-bottom:8px;">Arraste a foto pra escolher o que fica visível.</div>
+      <div id="cover-crop-box" style="position:relative; width:100%; aspect-ratio:3/1; overflow:hidden; border-radius:12px; background:#000; touch-action:none; cursor:grab;">
+        <img id="cover-crop-img" style="position:absolute; left:0; top:0; max-width:none; user-select:none; pointer-events:none;">
+      </div>
+      <button class="submit-btn" id="cover-crop-confirm">Usar essa foto</button>
+    </div>
+  </div>
+
   <!-- MODAL: TROCAR SENHA -->
   <div class="modal-overlay" id="modal-change-password">
     <div class="modal-sheet">
@@ -1337,18 +1352,101 @@ document.getElementById('avatar-change-input').addEventListener('change', async 
   await syncAll();
 });
 
-document.getElementById('cover-change-input').addEventListener('change', async (e)=>{
+/* ---- Ajustar / cortar a capa antes de enviar (também resolve envio lento, já que reduz o tamanho do arquivo) ---- */
+let coverCropState = null; // { img, natW, natH, scale, offX, offY, boxW, boxH }
+
+document.getElementById('cover-change-input').addEventListener('change', (e)=>{
   const file = (e.target.files || [])[0];
   if (!file || !currentUser) return;
-  const coverEl = document.getElementById('profile-cover');
-  coverEl.style.opacity = '0.5';
-  const path = `covers/${currentUser.id}-${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
-  const { error: upErr } = await sb.storage.from(BUCKET).upload(path, file);
-  if (upErr) { alert('Falha ao enviar a capa: ' + upErr.message); coverEl.style.opacity = '1'; return; }
-  const { error } = await sb.from('profiles').update({ cover_path: path }).eq('id', currentUser.id);
-  coverEl.style.opacity = '1';
-  if (error) { alert('Falha ao salvar a capa: ' + error.message); return; }
-  await syncAll();
+  const img = document.getElementById('cover-crop-img');
+  const box = document.getElementById('cover-crop-box');
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const boxW = box.clientWidth, boxH = box.clientHeight;
+    const natW = img.naturalWidth, natH = img.naturalHeight;
+    // escala mínima pra cobrir a caixa inteira, sem sobrar fundo preto
+    const scale = Math.max(boxW / natW, boxH / natH);
+    const dispW = natW * scale, dispH = natH * scale;
+    img.style.width = dispW + 'px';
+    img.style.height = dispH + 'px';
+    const offX = (boxW - dispW) / 2;
+    const offY = (boxH - dispH) / 2;
+    img.style.left = offX + 'px';
+    img.style.top = offY + 'px';
+    coverCropState = { natW, natH, scale, dispW, dispH, offX, offY, boxW, boxH };
+    openModal('modal-cover-crop');
+  };
+  img.src = url;
+  e.target.value = ''; // permite escolher o mesmo arquivo de novo depois
+});
+
+(function setupCoverDrag(){
+  const box = document.getElementById('cover-crop-box');
+  const img = document.getElementById('cover-crop-img');
+  let dragging = false, startX = 0, startY = 0, startOffX = 0, startOffY = 0;
+
+  function clampAndApply(offX, offY){
+    const s = coverCropState;
+    const minX = s.boxW - s.dispW, minY = s.boxH - s.dispH; // valores negativos (limite de arraste)
+    offX = Math.min(0, Math.max(minX, offX));
+    offY = Math.min(0, Math.max(minY, offY));
+    img.style.left = offX + 'px';
+    img.style.top = offY + 'px';
+    s.offX = offX; s.offY = offY;
+  }
+
+  function down(x, y){
+    if (!coverCropState) return;
+    dragging = true;
+    startX = x; startY = y;
+    startOffX = coverCropState.offX; startOffY = coverCropState.offY;
+    box.style.cursor = 'grabbing';
+  }
+  function move(x, y){
+    if (!dragging) return;
+    clampAndApply(startOffX + (x - startX), startOffY + (y - startY));
+  }
+  function up(){ dragging = false; box.style.cursor = 'grab'; }
+
+  box.addEventListener('mousedown', (e)=> down(e.clientX, e.clientY));
+  window.addEventListener('mousemove', (e)=> move(e.clientX, e.clientY));
+  window.addEventListener('mouseup', up);
+  box.addEventListener('touchstart', (e)=> down(e.touches[0].clientX, e.touches[0].clientY), {passive:true});
+  box.addEventListener('touchmove', (e)=> move(e.touches[0].clientX, e.touches[0].clientY), {passive:true});
+  box.addEventListener('touchend', up);
+})();
+
+document.getElementById('cover-crop-confirm').addEventListener('click', async ()=>{
+  if (!coverCropState || !currentUser) return;
+  const btn = document.getElementById('cover-crop-confirm');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+
+  const s = coverCropState;
+  const img = document.getElementById('cover-crop-img');
+  const OUT_W = 1200, OUT_H = 400; // 3:1, já otimizado pra web
+  const canvas = document.createElement('canvas');
+  canvas.width = OUT_W; canvas.height = OUT_H;
+  const ctx = canvas.getContext('2d');
+  // mapeia a área visível na caixa (recortada pelo arraste) pro canvas de saída
+  const srcX = (-s.offX) / s.scale;
+  const srcY = (-s.offY) / s.scale;
+  const srcW = s.boxW / s.scale;
+  const srcH = s.boxH / s.scale;
+  ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, OUT_W, OUT_H);
+
+  canvas.toBlob(async (blob) => {
+    const coverEl = document.getElementById('profile-cover');
+    coverEl.style.opacity = '0.5';
+    const path = `covers/${currentUser.id}-${crypto.randomUUID()}.jpg`;
+    const { error: upErr } = await sb.storage.from(BUCKET).upload(path, blob);
+    if (upErr) { alert('Falha ao enviar a capa: ' + upErr.message); coverEl.style.opacity = '1'; btn.disabled = false; btn.textContent = 'Usar essa foto'; return; }
+    const { error } = await sb.from('profiles').update({ cover_path: path }).eq('id', currentUser.id);
+    coverEl.style.opacity = '1';
+    btn.disabled = false; btn.textContent = 'Usar essa foto';
+    if (error) { alert('Falha ao salvar a capa: ' + error.message); return; }
+    closeModal('modal-cover-crop');
+    await syncAll();
+  }, 'image/jpeg', 0.85);
 });
 
 /* Restaura a sessão automaticamente se a pessoa já estava logada (fecha e reabre o navegador, por exemplo) */
@@ -1946,7 +2044,7 @@ document.getElementById('create-community-submit').addEventListener('click', asy
 });
 
 /* ---- Modal de lista (dono / membro), aberto a partir do perfil ---- */
-function openCommunitiesListModal(title, list){
+function openCommunitiesListModal(title, list, allowLeave){
   document.getElementById('communities-list-modal-title').textContent = title;
   const body = document.getElementById('communities-list-modal-body');
   body.innerHTML = list.length
@@ -1957,12 +2055,27 @@ function openCommunitiesListModal(title, list){
         return `
           <div class="person-row">
             <div style="width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;">${photoHTML}</div>
-            <div><div class="person-name" style="cursor:default;">${c.name}</div>
+            <div style="flex:1; min-width:0;"><div class="person-name" style="cursor:default;">${c.name}</div>
             <div class="person-sub">${communityMemberCount(c.id)} membro${communityMemberCount(c.id) === 1 ? '' : 's'}</div></div>
+            ${allowLeave ? `<button class="icon-btn" data-leave-community="${c.id}" title="Sair">🗑 Sair</button>` : ''}
           </div>
         `;
       }).join('')
     : '<div class="plan-note">Nenhuma comunidade por aqui ainda.</div>';
+
+  body.querySelectorAll('[data-leave-community]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if (!confirm('Sair dessa comunidade?')) return;
+      btn.disabled = true;
+      await sb.from('community_members').delete().eq('community_id', btn.dataset.leaveCommunity).eq('user_id', currentUser.id);
+      await fetchCommunities();
+      renderProfile();
+      renderComunidades();
+      const remaining = communities.filter(c => c.ownerId !== currentUser.id && isCommunityMember(c.id, currentUser.id));
+      openCommunitiesListModal(title, remaining, true);
+    });
+  });
+
   openModal('modal-communities-list');
 }
 
@@ -2194,7 +2307,7 @@ async function renderProfile(){
   document.getElementById('stat-communities-owner').textContent = ownedCommunities.length;
   document.getElementById('stat-communities-member').textContent = memberCommunities.length;
   document.getElementById('own-communities-owner-btn').onclick = () => openCommunitiesListModal('Comunidades que você criou', ownedCommunities);
-  document.getElementById('own-communities-member-btn').onclick = () => openCommunitiesListModal('Comunidades que você participa', memberCommunities);
+  document.getElementById('own-communities-member-btn').onclick = () => openCommunitiesListModal('Comunidades que você participa', memberCommunities, true);
 
   const grid = document.getElementById('profile-grid');
   document.getElementById('profile-empty').style.display = own.length ? 'none' : 'block';
@@ -2369,11 +2482,13 @@ async function openTestimonialsModal(userId, nome){
   const isOwn = userId === currentUser.id;
   list.innerHTML = (data && data.length) ? data.map(t => {
     const author = users.find(u=>u.id===t.author_id);
+    const isMine = t.author_id === currentUser.id;
+    const canRemove = isOwn || isMine;
     return `
       <div class="testimonial-item">
         <div class="t-author">${author ? author.nome : 'alguém'}</div>
         <div class="t-content">"${t.content}"</div>
-        ${isOwn ? `<button class="icon-btn" data-remove-testimonial="${t.id}" title="Remover" style="margin-top:4px;">🗑 Remover</button>` : ''}
+        ${canRemove ? `<button class="icon-btn" data-remove-testimonial="${t.id}" title="Remover" style="margin-top:4px;">🗑 Remover</button>` : ''}
       </div>
     `;
   }).join('') : '<div class="plan-note">Nenhum depoimento por aqui ainda.</div>';
