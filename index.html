@@ -700,7 +700,10 @@
       <div class="screen-sticky-top">
         <div class="app-header"><div class="wordmark" style="font-size:20px;">Perfil</div></div>
       </div>
-      <div class="cover"></div>
+      <div class="cover" id="profile-cover" style="cursor:pointer; position:relative;">
+        <div class="avatar-edit-badge" style="position:absolute; right:12px; bottom:12px;">✎</div>
+        <input type="file" id="cover-change-input" accept="image/*" style="position:absolute; inset:0; opacity:0; cursor:pointer;">
+      </div>
       <div class="profile-head">
         <div class="avatar-edit-wrap" id="avatar-edit-wrap">
           <div class="avatar-circle profile-avatar" id="profile-avatar"></div>
@@ -766,7 +769,7 @@
       <button class="upv-back" id="upv-close">← Voltar</button>
     </div>
     <div class="upv-body">
-      <div class="cover"></div>
+      <div class="cover" id="upv-cover"></div>
       <div class="profile-head">
         <div class="avatar-circle profile-avatar" id="upv-avatar"></div>
         <div class="profile-name" id="upv-name"></div>
@@ -1024,7 +1027,8 @@ async function fetchProfiles(){
   users = (data || []).map(p => ({
     id: p.id, nome: p.nome, usuario: p.usuario, email: '',
     telefone: p.telefone, nascimento: p.nascimento, criadoEm: new Date(p.created_at),
-    avatarUrl: p.avatar_path ? publicUrl(p.avatar_path) : null
+    avatarUrl: p.avatar_path ? publicUrl(p.avatar_path) : null,
+    coverUrl: p.cover_path ? publicUrl(p.cover_path) : null
   }));
 }
 
@@ -1330,6 +1334,20 @@ document.getElementById('avatar-change-input').addEventListener('change', async 
   const { error } = await sb.from('profiles').update({ avatar_path: path }).eq('id', currentUser.id);
   wrap.style.opacity = '1';
   if (error) { alert('Falha ao salvar a foto: ' + error.message); return; }
+  await syncAll();
+});
+
+document.getElementById('cover-change-input').addEventListener('change', async (e)=>{
+  const file = (e.target.files || [])[0];
+  if (!file || !currentUser) return;
+  const coverEl = document.getElementById('profile-cover');
+  coverEl.style.opacity = '0.5';
+  const path = `covers/${currentUser.id}-${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+  const { error: upErr } = await sb.storage.from(BUCKET).upload(path, file);
+  if (upErr) { alert('Falha ao enviar a capa: ' + upErr.message); coverEl.style.opacity = '1'; return; }
+  const { error } = await sb.from('profiles').update({ cover_path: path }).eq('id', currentUser.id);
+  coverEl.style.opacity = '1';
+  if (error) { alert('Falha ao salvar a capa: ' + error.message); return; }
   await syncAll();
 });
 
@@ -2159,6 +2177,10 @@ document.getElementById('service-submit').addEventListener('click', async ()=>{
 /* ================= PERFIL ================= */
 async function renderProfile(){
   if (!currentUser) return;
+  const coverEl = document.getElementById('profile-cover');
+  coverEl.style.backgroundImage = currentUser.coverUrl ? `url(${currentUser.coverUrl})` : '';
+  coverEl.style.backgroundSize = 'cover';
+  coverEl.style.backgroundPosition = 'center';
   document.getElementById('profile-avatar').outerHTML = avatarHTMLForUser(currentUser, 82).replace('avatar-circle', 'avatar-circle profile-avatar').replace('<div', '<div id="profile-avatar"');
   document.getElementById('profile-name').textContent = currentUser.nome;
   document.getElementById('profile-bio').textContent = `${atName(currentUser.usuario)} · ${currentUser.email}`;
@@ -2283,6 +2305,10 @@ document.getElementById('edit-profile-submit').addEventListener('click', async (
 async function openUserProfile(userId){
   const u = users.find(x => x.id === userId);
   if (!u) return;
+  const upvCoverEl = document.getElementById('upv-cover');
+  upvCoverEl.style.backgroundImage = u.coverUrl ? `url(${u.coverUrl})` : '';
+  upvCoverEl.style.backgroundSize = 'cover';
+  upvCoverEl.style.backgroundPosition = 'center';
   document.getElementById('upv-avatar').outerHTML = avatarHTMLForUser(u, 82).replace('avatar-circle', 'avatar-circle profile-avatar').replace('<div', '<div id="upv-avatar"');
   document.getElementById('upv-name').textContent = u.nome;
   document.getElementById('upv-bio').textContent = `${atName(u.usuario)}`;
