@@ -1374,9 +1374,9 @@ document.getElementById('cover-change-input').addEventListener('change', (e)=>{
     img.style.left = offX + 'px';
     img.style.top = offY + 'px';
     coverCropState = { natW, natH, scale, dispW, dispH, offX, offY, boxW, boxH };
-    openModal('modal-cover-crop');
   };
   img.src = url;
+  openModal('modal-cover-crop'); // abre primeiro, pra caixa já ter tamanho real quando a imagem carregar
   e.target.value = ''; // permite escolher o mesmo arquivo de novo depois
 });
 
