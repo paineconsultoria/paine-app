@@ -2312,10 +2312,25 @@ async function renderProfile(){
   const grid = document.getElementById('profile-grid');
   document.getElementById('profile-empty').style.display = own.length ? 'none' : 'block';
   grid.innerHTML = own.map(m => `
-    <div class="grid-item">
-      ${m.isVideo ? `<video src="${m.mediaUrl}" poster="${m.posterUrl || ''}" muted playsinline preload="metadata"></video>` : `<img src="${m.mediaUrl}">`}
+    <div class="grid-item" style="position:relative;">
+      <div data-open-photo="${m.id}" style="width:100%; height:100%; cursor:pointer;">
+        ${m.isVideo ? `<video src="${m.mediaUrl}" poster="${m.posterUrl || ''}" muted playsinline preload="metadata"></video>` : `<img src="${m.mediaUrl}">`}
+      </div>
+      <div style="position:absolute; top:4px; right:4px; display:flex; gap:2px; z-index:2;">
+        <button class="icon-btn" data-edit="${m.id}" title="Editar" style="background:rgba(0,0,0,0.55); color:#fff; border-radius:6px; padding:3px 5px;">✎</button>
+        <button class="icon-btn" data-delete="${m.id}" title="Apagar" style="background:rgba(0,0,0,0.55); color:#fff; border-radius:6px; padding:3px 5px;">🗑</button>
+      </div>
     </div>
   `).join('');
+  grid.querySelectorAll('[data-open-photo]').forEach(el=>{
+    el.addEventListener('click', ()=> openPhotoViewer(el.dataset.openPhoto));
+  });
+  grid.querySelectorAll('[data-edit]').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); openEditPost(el.dataset.edit); });
+  });
+  grid.querySelectorAll('[data-delete]').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); deleteMoment(el.dataset.delete); });
+  });
 
   // Depoimentos: contagem dos aceitos + lista dos pendentes pra você aprovar
   const { data: accepted } = await sb.from('testimonials').select('id').eq('target_id', currentUser.id).eq('status','accepted');
