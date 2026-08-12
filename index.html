@@ -1822,11 +1822,12 @@ function renderSearch(){
     const q = norm(searchInput.value);
     filtered = pool.filter(m=>{
       const peopleNames = m.taggedIds.map(id => users.find(u=>u.id===id)?.nome || '');
+      const authorName = users.find(u=>u.id===m.authorId)?.nome || '';
       if (!q) return true;
-      if (activeField === 'people') return peopleNames.some(p=>norm(p).includes(q));
+      if (activeField === 'people') return peopleNames.some(p=>norm(p).includes(q)) || norm(authorName).includes(q);
       if (activeField === 'subject') return norm(m.subject).includes(q);
       return norm(m.dateLabel).includes(q) || norm(m.place).includes(q) || norm(m.subject).includes(q) ||
-             norm(m.caption).includes(q) || peopleNames.some(p=>norm(p).includes(q));
+             norm(m.caption).includes(q) || norm(authorName).includes(q) || peopleNames.some(p=>norm(p).includes(q));
     });
     resultsLabel.textContent = q ? `Resultados para "${searchInput.value}"` : 'Suas recordações';
   }
