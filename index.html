@@ -683,13 +683,20 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c7d6e6" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
           <input type="text" id="services-search-input" placeholder="Buscar profissional, cidade ou serviço...">
         </div>
-        <div class="filters" id="services-category-filters" style="margin-top:12px;"></div>
         <button class="accept-btn" id="become-professional-btn" style="margin-top:14px; width:100%; padding:12px;">Oferecer meus serviços</button>
         <div id="my-services-wrap" style="display:none;">
           <div class="profile-section-label" style="padding:0;">Meus serviços</div>
           <div id="my-services-list"></div>
           <button class="accept-btn" id="add-service-btn" style="margin-top:10px; width:100%; padding:10px;">+ Novo serviço</button>
+
+          <div class="profile-section-label" style="padding:0; margin-top:18px;">Minha agenda</div>
+          <div id="my-availability-list"></div>
+          <button class="accept-btn" id="add-availability-btn" style="margin-top:10px; width:100%; padding:10px;">+ Horário disponível</button>
         </div>
+
+        <div class="profile-section-label" style="padding:0; margin-top:18px;">Meus agendamentos</div>
+        <div id="my-bookings-list"></div>
+
         <div class="results-label" style="margin-top:18px;">Profissionais disponíveis</div>
         <div id="services-list"></div>
       </div>
@@ -841,6 +848,55 @@
       <textarea class="field-input" id="prof-bio" placeholder="Conte um pouco sobre sua atuação..."></textarea>
       <div class="auth-error" id="become-professional-error"></div>
       <button class="submit-btn" id="become-professional-submit">Salvar e continuar</button>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVO HORÁRIO DISPONÍVEL -->
+  <div class="modal-overlay" id="modal-availability">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Novo horário disponível</div>
+        <button class="modal-close" data-close="modal-availability">✕</button>
+      </div>
+      <div class="field-label">Dia da semana</div>
+      <select class="field-input date-select" id="availability-day" style="width:100%;">
+        <option value="1">Segunda-feira</option>
+        <option value="2">Terça-feira</option>
+        <option value="3">Quarta-feira</option>
+        <option value="4">Quinta-feira</option>
+        <option value="5">Sexta-feira</option>
+        <option value="6">Sábado</option>
+        <option value="0">Domingo</option>
+      </select>
+      <div class="field-row">
+        <div>
+          <div class="field-label">Início</div>
+          <input class="field-input" type="time" id="availability-start">
+        </div>
+        <div>
+          <div class="field-label">Fim</div>
+          <input class="field-input" type="time" id="availability-end">
+        </div>
+      </div>
+      <div class="auth-error" id="availability-error"></div>
+      <button class="submit-btn" id="availability-submit">Salvar horário</button>
+    </div>
+  </div>
+
+  <!-- MODAL: AGENDAR -->
+  <div class="modal-overlay" id="modal-schedule">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Agendar</div>
+        <button class="modal-close" data-close="modal-schedule">✕</button>
+      </div>
+      <div id="schedule-service-info" class="note" style="margin-bottom:4px;"></div>
+      <div class="field-label">Data</div>
+      <input class="field-input" type="date" id="schedule-date">
+      <div class="field-label">Horário disponível</div>
+      <div class="tag-select-row" id="schedule-slots"></div>
+      <div class="auth-error" id="schedule-error"></div>
+      <button class="submit-btn" id="schedule-submit" disabled>Confirmar agendamento</button>
     </div>
   </div>
 
@@ -1147,8 +1203,29 @@ function myProfessionalProfile(){
   return professionalProfiles.find(p => p.id === currentUser.id);
 }
 
+let availabilityBlocks = []; // {id, professionalId, dayOfWeek, startTime, endTime}
+let bookings = [];           // {id, serviceId, professionalId, clientId, date, startTime, durationMinutes, status}
+
+async function fetchAvailability(){
+  const { data, error } = await sb.from('professional_availability').select('*');
+  if (error) { console.error(error); return; }
+  availabilityBlocks = (data || []).map(a => ({
+    id: a.id, professionalId: a.professional_id, dayOfWeek: a.day_of_week,
+    startTime: a.start_time, endTime: a.end_time
+  }));
+}
+
+async function fetchBookings(){
+  const { data, error } = await sb.from('bookings').select('*').eq('status', 'confirmed');
+  if (error) { console.error(error); return; }
+  bookings = (data || []).map(b => ({
+    id: b.id, serviceId: b.service_id, professionalId: b.professional_id, clientId: b.client_id,
+    date: b.booking_date, startTime: b.start_time, durationMinutes: b.duration_minutes, status: b.status
+  }));
+}
+
 async function syncAll(){
-  await Promise.all([fetchProfiles(), fetchConnections(), fetchMoments(), fetchStories(), fetchCommunities(), fetchServices()]);
+  await Promise.all([fetchProfiles(), fetchConnections(), fetchMoments(), fetchStories(), fetchCommunities(), fetchServices(), fetchAvailability(), fetchBookings()]);
   renderAll();
   renderInviteNotification();
 }
@@ -2119,26 +2196,12 @@ function openCommunityMembersModal(communityId){
 
 /* ================= SERVIÇOS ================= */
 const SERVICE_CATEGORIES = ['Psicologia','Psiquiatria','Nutrição','Personal Trainer / Educação Física','Fisioterapia','Terapia Ocupacional','Fonoaudiologia','Terapia de Casal / Família','Yoga / Pilates / Meditação','Coach de Sono','Acupuntura','Massoterapia','Cuidador(a) de Idosos','Outro'];
-let activeServiceCategory = 'Tudo';
 
 function renderServicos(){
   if (!currentUser) return;
-  renderServiceCategoryFilters();
   renderMyServices();
+  renderMyBookings();
   renderServicesSearch();
-}
-
-function renderServiceCategoryFilters(){
-  const wrap = document.getElementById('services-category-filters');
-  const cats = ['Tudo', ...SERVICE_CATEGORIES];
-  wrap.innerHTML = cats.map(c => `<button type="button" class="filter-chip ${c === activeServiceCategory ? 'on' : ''}" data-cat="${c}">${c}</button>`).join('');
-  wrap.querySelectorAll('[data-cat]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      activeServiceCategory = btn.dataset.cat;
-      renderServiceCategoryFilters();
-      renderServicesSearch();
-    });
-  });
 }
 
 function renderServicesSearch(){
@@ -2146,7 +2209,6 @@ function renderServicesSearch(){
   const q = (document.getElementById('services-search-input').value || '').trim().toLowerCase();
   const filtered = services.filter(s => {
     if (s.professionalId === currentUser.id) return false; // não mostra os próprios aqui, ficam em "Meus serviços"
-    if (activeServiceCategory !== 'Tudo' && s.category !== activeServiceCategory) return false;
     if (!q) return true;
     const prof = users.find(u => u.id === s.professionalId);
     const profData = professionalProfiles.find(p => p.id === s.professionalId);
@@ -2166,10 +2228,10 @@ function renderServicesSearch(){
     const profData = professionalProfiles.find(p => p.id === s.professionalId);
     if (!prof) return '';
     return `
-      <div class="person-row" style="align-items:flex-start;">
-        <div data-open-profile="${prof.id}" style="cursor:pointer; flex-shrink:0;">${avatarHTMLForUser(prof, 42)}</div>
+      <div class="person-row" style="align-items:flex-start; cursor:pointer;" data-open-schedule="${s.id}">
+        <div style="flex-shrink:0;">${avatarHTMLForUser(prof, 42)}</div>
         <div style="flex:1; min-width:0;">
-          <div class="person-name" data-open-profile="${prof.id}">${prof.nome}</div>
+          <div class="person-name">${prof.nome}</div>
           <div class="person-sub">${s.category}${profData && profData.cidade ? ' · ' + profData.cidade : ''}</div>
           <div style="font-family:'Fraunces',serif; font-size:13px; color:var(--cream); margin-top:4px;">${s.name}</div>
           ${s.description ? `<div style="font-size:11.5px; color:var(--cream-dim); margin-top:2px;">${s.description}</div>` : ''}
@@ -2182,8 +2244,8 @@ function renderServicesSearch(){
     `;
   }).join('');
 
-  list.querySelectorAll('[data-open-profile]').forEach(el=>{
-    el.addEventListener('click', ()=> openUserProfile(el.dataset.openProfile));
+  list.querySelectorAll('[data-open-schedule]').forEach(el=>{
+    el.addEventListener('click', ()=> openScheduleModal(el.dataset.openSchedule));
   });
 }
 document.getElementById('services-search-input').addEventListener('input', renderServicesSearch);
@@ -2221,7 +2283,178 @@ function renderMyServices(){
       renderServicos();
     });
   });
+
+  renderMyAvailability();
 }
+
+const WEEKDAY_NAMES = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+
+function renderMyAvailability(){
+  const mine = availabilityBlocks.filter(a => a.professionalId === currentUser.id)
+    .sort((a,b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime));
+  const list = document.getElementById('my-availability-list');
+  list.innerHTML = mine.length ? mine.map(a => `
+    <div class="person-row">
+      <div style="flex:1; min-width:0;">
+        <div class="person-name" style="cursor:default;">${WEEKDAY_NAMES[a.dayOfWeek]}</div>
+        <div class="person-sub">${a.startTime.slice(0,5)} às ${a.endTime.slice(0,5)}</div>
+      </div>
+      <button class="icon-btn" data-delete-availability="${a.id}" title="Apagar">🗑</button>
+    </div>
+  `).join('') : '<div class="plan-note">Nenhum horário cadastrado ainda — clientes não vão conseguir agendar até você adicionar.</div>';
+
+  list.querySelectorAll('[data-delete-availability]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if (!confirm('Apagar esse horário?')) return;
+      btn.disabled = true;
+      await sb.from('professional_availability').delete().eq('id', btn.dataset.deleteAvailability);
+      await fetchAvailability();
+      renderServicos();
+    });
+  });
+}
+
+document.getElementById('add-availability-btn').addEventListener('click', ()=>{
+  document.getElementById('availability-day').value = '1';
+  document.getElementById('availability-start').value = '09:00';
+  document.getElementById('availability-end').value = '18:00';
+  document.getElementById('availability-error').textContent = '';
+  openModal('modal-availability');
+});
+document.getElementById('availability-submit').addEventListener('click', async ()=>{
+  const dayOfWeek = parseInt(document.getElementById('availability-day').value, 10);
+  const startTime = document.getElementById('availability-start').value;
+  const endTime = document.getElementById('availability-end').value;
+  const err = document.getElementById('availability-error');
+  const btn = document.getElementById('availability-submit');
+  if (!startTime || !endTime || startTime >= endTime) { err.textContent = 'Escolha um início antes do fim.'; return; }
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  const { error } = await sb.from('professional_availability').insert({ professional_id: currentUser.id, day_of_week: dayOfWeek, start_time: startTime, end_time: endTime });
+  btn.disabled = false; btn.textContent = 'Salvar horário';
+  if (error) { err.textContent = 'Falha ao salvar: ' + error.message; return; }
+  await fetchAvailability();
+  renderServicos();
+  closeModal('modal-availability');
+});
+
+function renderMyBookings(){
+  const mine = bookings.filter(b => b.clientId === currentUser.id || b.professionalId === currentUser.id)
+    .sort((a,b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+  const list = document.getElementById('my-bookings-list');
+  list.innerHTML = mine.length ? mine.map(b => {
+    const service = services.find(s => s.id === b.serviceId);
+    const isClient = b.clientId === currentUser.id;
+    const otherUser = users.find(u => u.id === (isClient ? b.professionalId : b.clientId));
+    const [y,m,d] = b.date.split('-');
+    return `
+      <div class="person-row">
+        <div style="flex:1; min-width:0;">
+          <div class="person-name" style="cursor:default;">${service ? service.name : 'Serviço'}${otherUser ? (isClient ? ' — com ' + otherUser.nome : ' — de ' + otherUser.nome) : ''}</div>
+          <div class="person-sub">${d}/${m}/${y} às ${b.startTime.slice(0,5)}</div>
+        </div>
+        <button class="icon-btn" data-cancel-booking="${b.id}" title="Cancelar">🗑</button>
+      </div>
+    `;
+  }).join('') : '<div class="plan-note">Nenhum agendamento ainda.</div>';
+
+  list.querySelectorAll('[data-cancel-booking]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if (!confirm('Cancelar esse agendamento?')) return;
+      btn.disabled = true;
+      await sb.from('bookings').update({ status: 'cancelled' }).eq('id', btn.dataset.cancelBooking);
+      await fetchBookings();
+      renderServicos();
+    });
+  });
+}
+
+/* ---- Agendar (fluxo do cliente) ---- */
+let scheduleState = null; // { service, chosenSlot }
+function openScheduleModal(serviceId){
+  const service = services.find(s => s.id === serviceId);
+  if (!service) return;
+  scheduleState = { service, chosenSlot: null };
+  document.getElementById('schedule-service-info').textContent =
+    `${service.name} · R$ ${service.price.toFixed(2)}${service.durationMinutes ? ' · ' + service.durationMinutes + ' min' : ''}`;
+  const dateInput = document.getElementById('schedule-date');
+  dateInput.min = new Date().toISOString().slice(0,10);
+  dateInput.value = new Date().toISOString().slice(0,10);
+  document.getElementById('schedule-error').textContent = '';
+  document.getElementById('schedule-submit').disabled = true;
+  renderScheduleSlots();
+  openModal('modal-schedule');
+}
+document.getElementById('schedule-date').addEventListener('change', renderScheduleSlots);
+
+function renderScheduleSlots(){
+  const wrap = document.getElementById('schedule-slots');
+  const err = document.getElementById('schedule-error');
+  err.textContent = '';
+  if (!scheduleState) return;
+  const { service } = scheduleState;
+  const dateVal = document.getElementById('schedule-date').value;
+  if (!dateVal) { wrap.innerHTML = ''; return; }
+
+  const dayOfWeek = new Date(dateVal + 'T00:00:00').getDay();
+  const blocks = availabilityBlocks.filter(a => a.professionalId === service.professionalId && a.dayOfWeek === dayOfWeek);
+  const duration = service.durationMinutes || 60;
+
+  const takenTimes = bookings
+    .filter(b => b.professionalId === service.professionalId && b.date === dateVal)
+    .map(b => b.startTime.slice(0,5));
+
+  const slots = [];
+  blocks.forEach(block => {
+    let [h, m] = block.startTime.slice(0,5).split(':').map(Number);
+    const [endH, endM] = block.endTime.slice(0,5).split(':').map(Number);
+    while (h * 60 + m + duration <= endH * 60 + endM) {
+      const label = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      slots.push(label);
+      m += duration;
+      while (m >= 60) { m -= 60; h += 1; }
+    }
+  });
+
+  const available = slots.filter(s => !takenTimes.includes(s));
+  if (!available.length) {
+    wrap.innerHTML = '';
+    err.textContent = 'Sem horários disponíveis nesse dia — tente outra data.';
+    scheduleState.chosenSlot = null;
+    document.getElementById('schedule-submit').disabled = true;
+    return;
+  }
+
+  wrap.innerHTML = available.map(s => `<button type="button" class="tag-select" data-slot="${s}">${s}</button>`).join('');
+  wrap.querySelectorAll('[data-slot]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      wrap.querySelectorAll('.tag-select').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on');
+      scheduleState.chosenSlot = btn.dataset.slot;
+      document.getElementById('schedule-submit').disabled = false;
+    });
+  });
+}
+
+document.getElementById('schedule-submit').addEventListener('click', async ()=>{
+  if (!scheduleState || !scheduleState.chosenSlot) return;
+  const { service, chosenSlot } = scheduleState;
+  const dateVal = document.getElementById('schedule-date').value;
+  const err = document.getElementById('schedule-error');
+  const btn = document.getElementById('schedule-submit');
+  btn.disabled = true; btn.textContent = 'Agendando...';
+
+  const { error } = await sb.from('bookings').insert({
+    service_id: service.id, professional_id: service.professionalId, client_id: currentUser.id,
+    booking_date: dateVal, start_time: chosenSlot, duration_minutes: service.durationMinutes
+  });
+  btn.disabled = false; btn.textContent = 'Confirmar agendamento';
+  if (error) { err.textContent = 'Falha ao agendar: ' + error.message; return; }
+
+  await fetchBookings();
+  renderServicos();
+  closeModal('modal-schedule');
+  alert('Agendado! Você pode ver e cancelar em "Meus agendamentos", na aba Serviços.');
+});
 
 /* ---- Virar profissional ---- */
 document.getElementById('become-professional-btn').addEventListener('click', ()=>{
