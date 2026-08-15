@@ -896,7 +896,41 @@
       <div class="field-label">Horário disponível</div>
       <div class="tag-select-row" id="schedule-slots"></div>
       <div class="auth-error" id="schedule-error"></div>
-      <button class="submit-btn" id="schedule-submit" disabled>Confirmar agendamento</button>
+      <button class="submit-btn" id="schedule-submit" disabled>Ir para pagamento</button>
+    </div>
+  </div>
+
+  <!-- MODAL: CHECKOUT (SIMULADO) -->
+  <div class="modal-overlay" id="modal-checkout">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <div class="modal-title">Pagamento (simulado)</div>
+        <button class="modal-close" data-close="modal-checkout">✕</button>
+      </div>
+      <div class="plan-note" style="margin-bottom:10px;">Nenhum valor real é cobrado — isso é só uma simulação do fluxo, sem gateway de pagamento conectado ainda.</div>
+      <div id="checkout-summary"></div>
+
+      <div class="field-label">Forma de pagamento</div>
+      <div class="tag-select-row" style="margin-bottom:4px;">
+        <button type="button" class="tag-select on" data-pay-method="pix">Pix</button>
+        <button type="button" class="tag-select" data-pay-method="cartao">Cartão</button>
+      </div>
+
+      <div id="checkout-pix-box" style="text-align:center; padding:18px 0;">
+        <div style="width:140px; height:140px; margin:0 auto 10px; border-radius:10px; background:repeating-conic-gradient(#1c2a3a 0% 25%, #fff 0% 50%) 50% / 18px 18px; opacity:0.85;"></div>
+        <div class="plan-note">QR code ilustrativo — pagamento simulado.</div>
+      </div>
+      <div id="checkout-card-box" style="display:none;">
+        <div class="field-label">Número do cartão</div>
+        <input class="field-input" type="text" placeholder="0000 0000 0000 0000" disabled>
+        <div class="field-row">
+          <div><div class="field-label">Validade</div><input class="field-input" type="text" placeholder="MM/AA" disabled></div>
+          <div><div class="field-label">CVV</div><input class="field-input" type="text" placeholder="123" disabled></div>
+        </div>
+        <div class="plan-note">Campos ilustrativos — nenhum dado real é enviado.</div>
+      </div>
+
+      <button class="submit-btn" id="checkout-confirm">Simular pagamento</button>
     </div>
   </div>
 
@@ -1220,7 +1254,9 @@ async function fetchBookings(){
   if (error) { console.error(error); return; }
   bookings = (data || []).map(b => ({
     id: b.id, serviceId: b.service_id, professionalId: b.professional_id, clientId: b.client_id,
-    date: b.booking_date, startTime: b.start_time, durationMinutes: b.duration_minutes, status: b.status
+    date: b.booking_date, startTime: b.start_time, durationMinutes: b.duration_minutes, status: b.status,
+    paymentStatus: b.payment_status, amount: b.amount ? Number(b.amount) : null,
+    commissionPercent: b.commission_percent, professionalAmount: b.professional_amount ? Number(b.professional_amount) : null
   }));
 }
 
@@ -2346,11 +2382,16 @@ function renderMyBookings(){
     const isClient = b.clientId === currentUser.id;
     const otherUser = users.find(u => u.id === (isClient ? b.professionalId : b.clientId));
     const [y,m,d] = b.date.split('-');
+    const paid = b.paymentStatus === 'pago';
+    const valueLine = isClient
+      ? (b.amount != null ? `R$ ${b.amount.toFixed(2)}` : '')
+      : (b.professionalAmount != null ? `Você recebe R$ ${b.professionalAmount.toFixed(2)}` : '');
     return `
       <div class="person-row">
         <div style="flex:1; min-width:0;">
           <div class="person-name" style="cursor:default;">${service ? service.name : 'Serviço'}${otherUser ? (isClient ? ' — com ' + otherUser.nome : ' — de ' + otherUser.nome) : ''}</div>
-          <div class="person-sub">${d}/${m}/${y} às ${b.startTime.slice(0,5)}</div>
+          <div class="person-sub">${d}/${m}/${y} às ${b.startTime.slice(0,5)}${valueLine ? ' · ' + valueLine : ''}</div>
+          <span class="tag ${paid ? 'people' : ''}" style="margin-top:4px; display:inline-block;">${paid ? '✓ Pago (simulado)' : 'Aguardando pagamento'}</span>
         </div>
         <button class="icon-btn" data-cancel-booking="${b.id}" title="Cancelar">🗑</button>
       </div>
@@ -2435,25 +2476,74 @@ function renderScheduleSlots(){
   });
 }
 
-document.getElementById('schedule-submit').addEventListener('click', async ()=>{
+const DEFAULT_COMMISSION_PERCENT = 15; // fixo por enquanto — vai virar dinâmico por avaliação quando o sistema de notas existir
+
+document.getElementById('schedule-submit').addEventListener('click', ()=>{
   if (!scheduleState || !scheduleState.chosenSlot) return;
+  closeModal('modal-schedule');
+  openCheckoutModal();
+});
+
+function openCheckoutModal(){
   const { service, chosenSlot } = scheduleState;
   const dateVal = document.getElementById('schedule-date').value;
-  const err = document.getElementById('schedule-error');
-  const btn = document.getElementById('schedule-submit');
-  btn.disabled = true; btn.textContent = 'Agendando...';
+  const [y,m,d] = dateVal.split('-');
+  const amount = service.price;
+  const commissionPercent = DEFAULT_COMMISSION_PERCENT;
+  const professionalAmount = amount * (1 - commissionPercent / 100);
+  const commissionAmount = amount - professionalAmount;
+  scheduleState.checkout = { amount, commissionPercent, professionalAmount };
+
+  document.getElementById('checkout-summary').innerHTML = `
+    <div class="person-row" style="border-bottom:1px solid var(--hair); padding-bottom:12px; margin-bottom:12px;">
+      <div style="flex:1;">
+        <div class="person-name" style="cursor:default;">${service.name}</div>
+        <div class="person-sub">${d}/${m}/${y} às ${chosenSlot}</div>
+      </div>
+    </div>
+    <div style="font-size:13px; color:var(--cream-dim); line-height:1.9;">
+      <div style="display:flex; justify-content:space-between;"><span>Valor da consulta</span><strong style="color:var(--cream);">R$ ${amount.toFixed(2)}</strong></div>
+      <div style="display:flex; justify-content:space-between;"><span>Taxa de intermediação do Paine (${commissionPercent}%)</span><span>− R$ ${commissionAmount.toFixed(2)}</span></div>
+      <div style="display:flex; justify-content:space-between; color:var(--lime-soft); font-weight:600;"><span>Profissional recebe</span><span>R$ ${professionalAmount.toFixed(2)}</span></div>
+    </div>
+  `;
+  document.querySelectorAll('[data-pay-method]').forEach(b=>b.classList.remove('on'));
+  document.querySelector('[data-pay-method="pix"]').classList.add('on');
+  document.getElementById('checkout-pix-box').style.display = 'block';
+  document.getElementById('checkout-card-box').style.display = 'none';
+  openModal('modal-checkout');
+}
+
+document.querySelectorAll('[data-pay-method]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-pay-method]').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    const isPix = btn.dataset.payMethod === 'pix';
+    document.getElementById('checkout-pix-box').style.display = isPix ? 'block' : 'none';
+    document.getElementById('checkout-card-box').style.display = isPix ? 'none' : 'block';
+  });
+});
+
+document.getElementById('checkout-confirm').addEventListener('click', async ()=>{
+  if (!scheduleState || !scheduleState.chosenSlot) return;
+  const { service, chosenSlot, checkout } = scheduleState;
+  const dateVal = document.getElementById('schedule-date').value;
+  const btn = document.getElementById('checkout-confirm');
+  btn.disabled = true; btn.textContent = 'Simulando pagamento...';
 
   const { error } = await sb.from('bookings').insert({
     service_id: service.id, professional_id: service.professionalId, client_id: currentUser.id,
-    booking_date: dateVal, start_time: chosenSlot, duration_minutes: service.durationMinutes
+    booking_date: dateVal, start_time: chosenSlot, duration_minutes: service.durationMinutes,
+    payment_status: 'pago', amount: checkout.amount,
+    commission_percent: checkout.commissionPercent, professional_amount: checkout.professionalAmount
   });
-  btn.disabled = false; btn.textContent = 'Confirmar agendamento';
-  if (error) { err.textContent = 'Falha ao agendar: ' + error.message; return; }
+  btn.disabled = false; btn.textContent = 'Simular pagamento';
+  if (error) { alert('Falha ao agendar: ' + error.message); return; }
 
   await fetchBookings();
   renderServicos();
-  closeModal('modal-schedule');
-  alert('Agendado! Você pode ver e cancelar em "Meus agendamentos", na aba Serviços.');
+  closeModal('modal-checkout');
+  alert('Pagamento simulado com sucesso! Agendamento confirmado — veja em "Meus agendamentos".');
 });
 
 /* ---- Virar profissional ---- */
