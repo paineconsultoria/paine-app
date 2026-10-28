@@ -1,4 +1,4 @@
-const CACHE_NAME = 'paine-v2';
+const CACHE_NAME = 'kairos-v1';
 const ASSETS = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
